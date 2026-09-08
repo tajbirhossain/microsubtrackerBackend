@@ -1,0 +1,120 @@
+export type MerchantPattern = {
+  key: string;
+  name: string;
+  aliases: string[];
+  categorySlug: string;
+  defaultBillingCycle: "weekly" | "monthly" | "yearly";
+  color: string;
+  icon: string;
+};
+
+export const MERCHANT_PATTERNS: MerchantPattern[] = [
+  {
+    key: "netflix",
+    name: "Netflix",
+    aliases: ["netflix", "nflx"],
+    categorySlug: "entertainment",
+    defaultBillingCycle: "monthly",
+    color: "#E50914",
+    icon: "N",
+  },
+  {
+    key: "spotify",
+    name: "Spotify",
+    aliases: ["spotify"],
+    categorySlug: "entertainment",
+    defaultBillingCycle: "monthly",
+    color: "#1DB954",
+    icon: "♪",
+  },
+  {
+    key: "disney",
+    name: "Disney+",
+    aliases: ["disney+", "disney plus", "disneyplus", "disney"],
+    categorySlug: "entertainment",
+    defaultBillingCycle: "monthly",
+    color: "#113CCF",
+    icon: "+",
+  },
+  {
+    key: "youtube",
+    name: "YouTube Premium",
+    aliases: ["youtube premium", "youtube", "yt premium"],
+    categorySlug: "entertainment",
+    defaultBillingCycle: "monthly",
+    color: "#FF0000",
+    icon: "▶",
+  },
+  {
+    key: "openai",
+    name: "ChatGPT Plus",
+    aliases: ["chatgpt", "openai", "chat gpt"],
+    categorySlug: "productivity",
+    defaultBillingCycle: "monthly",
+    color: "#10A37F",
+    icon: "✦",
+  },
+  {
+    key: "adobe",
+    name: "Adobe Creative Cloud",
+    aliases: ["adobe", "creative cloud"],
+    categorySlug: "productivity",
+    defaultBillingCycle: "monthly",
+    color: "#FF0000",
+    icon: "Ae",
+  },
+  {
+    key: "notion",
+    name: "Notion",
+    aliases: ["notion"],
+    categorySlug: "productivity",
+    defaultBillingCycle: "monthly",
+    color: "#111111",
+    icon: "N",
+  },
+  {
+    key: "dropbox",
+    name: "Dropbox Plus",
+    aliases: ["dropbox"],
+    categorySlug: "cloud",
+    defaultBillingCycle: "monthly",
+    color: "#0061FF",
+    icon: "D",
+  },
+  {
+    key: "canva",
+    name: "Canva Pro",
+    aliases: ["canva", "canva*pro", "canva pro"],
+    categorySlug: "productivity",
+    defaultBillingCycle: "monthly",
+    color: "#00C4CC",
+    icon: "C",
+  },
+  {
+    key: "icloud",
+    name: "iCloud+",
+    aliases: ["icloud", "icloud+"],
+    categorySlug: "cloud",
+    defaultBillingCycle: "monthly",
+    color: "#3B82F6",
+    icon: "☁",
+  },
+  {
+    key: "prime",
+    name: "Amazon Prime",
+    aliases: ["amazon prime", "prime video", "amzn prime"],
+    categorySlug: "shopping",
+    defaultBillingCycle: "yearly",
+    color: "#FF9900",
+    icon: "a",
+  },
+  {
+    key: "headspace",
+    name: "Headspace",
+    aliases: ["headspace"],
+    categorySlug: "health",
+    defaultBillingCycle: "yearly",
+    color: "#F47D31",
+    icon: "◉",
+  },
+];

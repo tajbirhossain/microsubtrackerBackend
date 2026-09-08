@@ -10,7 +10,11 @@
     "dev": "nodemon",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/scripts/migrate.ts",
-    "migrate:prod": "node dist/scripts/migrate.js"
+    "migrate:prod": "node dist/scripts/migrate.js",
+    "worker": "tsx src/scripts/worker.ts",
+    "worker:prod": "node dist/scripts/worker.js",
+    "jobs:enqueue": "tsx src/scripts/enqueue-jobs.ts",
+    "parser:test": "tsx src/scripts/test-parser.ts"
   },
   "keywords": [
     "express",
@@ -21,6 +25,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.3.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

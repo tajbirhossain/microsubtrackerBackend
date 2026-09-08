@@ -79,6 +79,11 @@ export function loadConfig(): AppConfig {
         60 * 60 * 24 * 30
       ),
     },
+    jobs: {
+      concurrency: optionalPositiveInt("JOB_CONCURRENCY", 5),
+      attempts: optionalPositiveInt("JOB_ATTEMPTS", 5),
+      backoffMs: optionalPositiveInt("JOB_BACKOFF_MS", 2000),
+    },
   };
 }
 

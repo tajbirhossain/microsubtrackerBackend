@@ -27,6 +27,12 @@ export interface RedisConfig {
   sessionTtlSeconds: number;
 }
 
+export interface JobsConfig {
+  concurrency: number;
+  attempts: number;
+  backoffMs: number;
+}
+
 export interface AppConfig {
   env: string;
   port: number;
@@ -34,6 +40,7 @@ export interface AppConfig {
   database: DatabaseConfig;
   auth: AuthConfig;
   redis: RedisConfig;
+  jobs: JobsConfig;
 }
 
 export interface ApiSuccessResponse<T = unknown> {

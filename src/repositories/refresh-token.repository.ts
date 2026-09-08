@@ -78,20 +78,18 @@ export async function revokeRefreshTokensForUser(
   );
 }
 
-export async function revokeRefreshTokensForDevice(
-  userId: string,
-  deviceId: string,
+export async function revokeExpiredRefreshTokens(
   client?: Queryable
-): Promise<void> {
-  await query(
+): Promise<number> {
+  const result = await query(
     `
       UPDATE refresh_tokens
       SET revoked_at = NOW()
-      WHERE user_id = $1
-        AND device_id = $2
-        AND revoked_at IS NULL
+      WHERE revoked_at IS NULL
+        AND expires_at <= NOW()
     `,
-    [userId, deviceId],
+    [],
     client
   );
+  return result.rowCount ?? 0;
 }

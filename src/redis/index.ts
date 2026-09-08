@@ -19,3 +19,5 @@ export {
 } from "./idempotency.js";
 export { getQueueConnection, getQueueRedis } from "./queue.js";
 export { checkRedisHealth, type RedisHealth } from "./health.js";
+
+// Job queue lives in src/jobs (BullMQ). Use getQueueConnection() from there.
