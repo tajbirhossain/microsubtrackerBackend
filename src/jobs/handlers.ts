@@ -4,6 +4,7 @@ import { revokeExpiredRefreshTokens } from "../repositories/refresh-token.reposi
 import { listUsersWithPreferenceEnabled } from "../repositories/notification-preferences.repository.js";
 import { processNotificationDelivery } from "../services/notification.service.js";
 import { refreshCurrencyRates } from "../services/currency.service.js";
+import { logger } from "../observability/logger.js";
 import {
   roundMoney,
   toMonthlyAmount,
@@ -249,8 +250,14 @@ export async function handleCurrencyRateUpdate(): Promise<{
   fetchedAt: string;
 }> {
   const result = await refreshCurrencyRates();
-  console.info(
-    `[currency] refreshed base=${result.base} count=${result.count} source=${result.source} fallback=${result.fallback}`
+  logger.info(
+    {
+      base: result.base,
+      count: result.count,
+      source: result.source,
+      fallback: result.fallback,
+    },
+    "currency_refreshed"
   );
   return result;
 }
@@ -262,8 +269,13 @@ export async function handleProcessNotification(
 
   if (result.skipReason === "quiet_hours" && result.delayedMs) {
     await enqueueNotification(data, { delayMs: result.delayedMs });
-    console.info(
-      `[notify:${data.type}] quiet-hours delay=${result.delayedMs}ms user=${data.userId}`
+    logger.info(
+      {
+        type: data.type,
+        user_id: data.userId,
+        delay_ms: result.delayedMs,
+      },
+      "notification_quiet_hours_delayed"
     );
   }
 
@@ -295,8 +307,13 @@ export async function handleMonthlyCalculations(): Promise<{
     byUser.set(row.user_id, (byUser.get(row.user_id) ?? 0) + monthly);
   }
 
-  console.info(
-    `[monthly-calculations] users=${byUser.size} burn=${roundMoney(monthlyTotal)} yearly~=${roundMoney(toYearlyAmount(monthlyTotal, "monthly"))}`
+  logger.info(
+    {
+      users: byUser.size,
+      monthly_total: roundMoney(monthlyTotal),
+      yearly_total: roundMoney(toYearlyAmount(monthlyTotal, "monthly")),
+    },
+    "monthly_calculations"
   );
 
   return {
@@ -309,6 +326,6 @@ export async function handleExpiredSessionCleanup(): Promise<{
   revoked: number;
 }> {
   const revoked = await revokeExpiredRefreshTokens();
-  console.info(`[session-cleanup] revoked=${revoked}`);
+  logger.info({ revoked }, "session_cleanup");
   return { revoked };
 }

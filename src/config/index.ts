@@ -44,6 +44,56 @@ function parseCorsOrigins(raw: string): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+function parseDatabaseUrlHost(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function isSupabaseDatabaseUrl(url: string): boolean {
+  const host = parseDatabaseUrlHost(url) ?? url;
+  return (
+    host.includes("supabase.co") ||
+    host.includes("supabase.com") ||
+    host.includes("pooler.supabase")
+  );
+}
+
+function isLocalDatabaseUrl(url: string): boolean {
+  const host = parseDatabaseUrlHost(url);
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
+/**
+ * Supabase (and most hosted Postgres) require TLS.
+ * LOCALHOST → no SSL unless DATABASE_SSL=true.
+ */
+function resolveDatabaseSsl(
+  url: string
+): false | { rejectUnauthorized: boolean } {
+  const mode = optionalEnv("DATABASE_SSL", "auto").toLowerCase();
+  const rejectUnauthorized =
+    optionalEnv("DATABASE_SSL_REJECT_UNAUTHORIZED", "false").toLowerCase() ===
+    "true";
+
+  if (mode === "false" || mode === "disable" || mode === "off") {
+    return false;
+  }
+
+  if (mode === "true" || mode === "require" || mode === "on") {
+    return { rejectUnauthorized };
+  }
+
+  // auto
+  if (isLocalDatabaseUrl(url) && !isSupabaseDatabaseUrl(url)) {
+    return false;
+  }
+
+  return { rejectUnauthorized };
+}
+
 export function loadConfig(): AppConfig {
   const env = process.env.NODE_ENV ?? "development";
   const isDev = env === "development";
@@ -58,15 +108,38 @@ export function loadConfig(): AppConfig {
           })()
       : accessTokenSecret;
 
+  const databaseUrl = requireEnv("DATABASE_URL");
+  const directUrl = optionalEnv("DATABASE_DIRECT_URL", "") || null;
+  const supabase =
+    isSupabaseDatabaseUrl(databaseUrl) ||
+    (directUrl ? isSupabaseDatabaseUrl(directUrl) : false);
+
+  // Nano free tier ~15 server-side pool slots. API + worker each open a pool,
+  // so keep per-process max small (3 default, hard-capped at 5).
+  const requestedPoolMax = optionalPositiveInt(
+    "DB_POOL_MAX",
+    supabase ? 3 : 10
+  );
+  const poolMax = supabase ? Math.min(requestedPoolMax, 5) : requestedPoolMax;
+
   return {
     env,
     port: optionalPositiveInt("PORT", 5000),
     isDev,
     database: {
-      url: requireEnv("DATABASE_URL"),
-      poolMax: optionalPositiveInt("DB_POOL_MAX", 10),
-      idleTimeoutMs: optionalPositiveInt("DB_IDLE_TIMEOUT_MS", 30_000),
-      connectionTimeoutMs: optionalPositiveInt("DB_CONNECTION_TIMEOUT_MS", 5_000),
+      url: databaseUrl,
+      directUrl,
+      poolMax,
+      idleTimeoutMs: optionalPositiveInt(
+        "DB_IDLE_TIMEOUT_MS",
+        supabase ? 10_000 : 30_000
+      ),
+      connectionTimeoutMs: optionalPositiveInt(
+        "DB_CONNECTION_TIMEOUT_MS",
+        supabase ? 15_000 : 10_000
+      ),
+      ssl: resolveDatabaseSsl(databaseUrl),
+      isSupabase: supabase,
     },
     auth: {
       accessTokenSecret,
@@ -126,12 +199,32 @@ export function loadConfig(): AppConfig {
   };
 }
 
-export function toPoolConfig(database: AppConfig["database"]): PoolConfig {
+export function toPoolConfig(
+  database: AppConfig["database"],
+  options?: { forMigrations?: boolean }
+): PoolConfig {
+  const connectionString =
+    options?.forMigrations && database.directUrl
+      ? database.directUrl
+      : database.url;
+
+  const ssl = resolveDatabaseSsl(connectionString);
+
+  // Migrations only need a single connection.
+  const max = options?.forMigrations
+    ? 1
+    : database.isSupabase
+      ? Math.min(database.poolMax, 5)
+      : database.poolMax;
+
   return {
-    connectionString: database.url,
-    max: database.poolMax,
+    connectionString,
+    max,
     idleTimeoutMillis: database.idleTimeoutMs,
     connectionTimeoutMillis: database.connectionTimeoutMs,
+    allowExitOnIdle: database.isSupabase || Boolean(options?.forMigrations),
+    ...(database.isSupabase ? { maxUses: 5_000 } : {}),
+    ...(ssl ? { ssl } : {}),
   };
 }
 

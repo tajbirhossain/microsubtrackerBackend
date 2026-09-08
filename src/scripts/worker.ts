@@ -1,6 +1,7 @@
 import { closePool } from "../db/pool.js";
 import { closeQueue } from "../jobs/queues.js";
 import { startWorkers, stopWorkers } from "../jobs/worker.js";
+import { logger } from "../observability/logger.js";
 import { closeRedis, connectRedis } from "../redis/client.js";
 
 async function main(): Promise<void> {
@@ -8,14 +9,18 @@ async function main(): Promise<void> {
   const worker = await startWorkers();
 
   async function shutdown(signal: string): Promise<void> {
-    console.log(`Received ${signal}. Stopping worker...`);
+    logger.info({ signal }, "worker_shutdown_started");
     try {
       await stopWorkers(worker);
       await closeQueue();
       await Promise.all([closePool(), closeRedis()]);
+      logger.info("worker_shutdown_complete");
       process.exit(0);
     } catch (error) {
-      console.error("Worker shutdown failed", error);
+      logger.error(
+        { err: error instanceof Error ? error.message : String(error) },
+        "worker_shutdown_failed"
+      );
       process.exit(1);
     }
   }
@@ -29,6 +34,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("Worker failed to start", error);
+  logger.error(
+    { err: error instanceof Error ? error.message : String(error) },
+    "worker_start_failed"
+  );
   process.exit(1);
 });

@@ -1,5 +1,8 @@
 import { Worker, type Job } from "bullmq";
 import config from "../config/index.js";
+import { captureError } from "../observability/errors.js";
+import { childLogger } from "../observability/logger.js";
+import { recordJobResult } from "../observability/metrics.js";
 import { createQueueConnection } from "./connection.js";
 import { JobName, QUEUE_NAME, type NotificationJobData } from "./constants.js";
 import {
@@ -16,6 +19,7 @@ import {
 import { registerRepeatableSchedulers } from "./producers.js";
 
 const connection = createQueueConnection();
+const workerLog = childLogger({ component: "worker" });
 
 async function processJob(job: Job): Promise<unknown> {
   switch (job.name) {
@@ -52,22 +56,58 @@ export async function startWorkers(): Promise<Worker> {
   });
 
   worker.on("completed", (job) => {
-    console.info(`[worker] completed ${job.name} id=${job.id}`);
+    const durationMs = job.finishedOn && job.processedOn
+      ? job.finishedOn - job.processedOn
+      : undefined;
+
+    workerLog.info(
+      {
+        job_name: job.name,
+        job_id: job.id,
+        duration_ms: durationMs,
+      },
+      "job_completed"
+    );
+
+    void recordJobResult({
+      jobName: job.name,
+      outcome: "completed",
+      durationMs,
+    });
   });
 
   worker.on("failed", (job, error) => {
-    console.error(
-      `[worker] failed ${job?.name ?? "unknown"} id=${job?.id} attempt=${job?.attemptsMade}:`,
-      error.message
+    workerLog.error(
+      {
+        job_name: job?.name,
+        job_id: job?.id,
+        attempt: job?.attemptsMade,
+        err: { message: error.message, stack: error.stack },
+      },
+      "job_failed"
     );
+
+    void recordJobResult({
+      jobName: job?.name ?? "unknown",
+      outcome: "failed",
+    });
+
+    void captureError(error, {
+      jobName: job?.name,
+      jobId: job?.id,
+    });
   });
 
   worker.on("error", (error) => {
-    console.error("[worker] error", error);
+    void captureError(error, { jobName: "worker" });
   });
 
-  console.info(
-    `[worker] listening on queue=${QUEUE_NAME} concurrency=${config.jobs.concurrency}`
+  workerLog.info(
+    {
+      queue: QUEUE_NAME,
+      concurrency: config.jobs.concurrency,
+    },
+    "worker_listening"
   );
 
   return worker;
@@ -76,4 +116,5 @@ export async function startWorkers(): Promise<Worker> {
 export async function stopWorkers(worker: Worker): Promise<void> {
   await worker.close();
   await connection.quit();
+  workerLog.info("worker_stopped");
 }

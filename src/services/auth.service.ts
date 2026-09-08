@@ -40,6 +40,7 @@ import type {
 import type { AuthTokens, AuthUser, OtpPurpose } from "../types/index.js";
 import { AppError } from "../utils/errors.js";
 import { hashPassword, TIMING_SAFE_DUMMY_HASH, verifyPassword } from "../utils/password.js";
+import { logger } from "../observability/logger.js";
 import {
   addSeconds,
   generateOpaqueToken,
@@ -183,7 +184,14 @@ async function issueOtpChallenge(input: {
   });
 
   if (config.isDev) {
-    console.info(`[auth:otp:${input.purpose}] ${input.phone} => ${code}`);
+    logger.info(
+      {
+        purpose: input.purpose,
+        phone: input.phone,
+        ...(config.isDev ? { code } : { code: "[redacted]" }),
+      },
+      "otp_issued"
+    );
   }
 
   return {

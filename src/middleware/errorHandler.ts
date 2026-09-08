@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import config from "../config/index.js";
+import { captureErrorFromRequest } from "../observability/errors.js";
 import { isAppError } from "../utils/errors.js";
 import type { HttpError } from "../types/index.js";
 
@@ -12,7 +13,7 @@ function publicMessage(statusCode: number, message: string): string {
 
 export function errorHandler(
   err: HttpError | Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
@@ -20,11 +21,24 @@ export function errorHandler(
   const statusCode = appErr?.statusCode ?? 500;
   const message = publicMessage(
     statusCode,
-    appErr?.message ?? (err instanceof Error ? err.message : "Internal Server Error")
+    appErr?.message ??
+      (err instanceof Error ? err.message : "Internal Server Error")
   );
 
   if (statusCode >= 500) {
-    console.error(err);
+    void captureErrorFromRequest(err, req, statusCode);
+  } else if (statusCode >= 400) {
+    req.log?.warn(
+      {
+        request_id: req.requestId,
+        user_id: req.user?.id,
+        method: req.method,
+        path: req.originalUrl,
+        status: statusCode,
+        message,
+      },
+      "request_error"
+    );
   }
 
   const details =
@@ -35,6 +49,7 @@ export function errorHandler(
   res.status(statusCode).json({
     success: false,
     message,
+    requestId: req.requestId,
     ...(details !== undefined ? { details } : {}),
     ...(config.isDev && err instanceof Error && err.stack
       ? { stack: err.stack }

@@ -1,8 +1,12 @@
 export interface DatabaseConfig {
   url: string;
+  /** Prefer session/direct connection for migrations (Supabase Direct URL). */
+  directUrl: string | null;
   poolMax: number;
   idleTimeoutMs: number;
   connectionTimeoutMs: number;
+  ssl: false | { rejectUnauthorized: boolean };
+  isSupabase: boolean;
 }
 
 export interface AuthConfig {

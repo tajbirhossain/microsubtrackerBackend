@@ -1,27 +1,36 @@
 import app from "./app.js";
 import config from "./config/index.js";
 import { closePool } from "./db/pool.js";
+import { logger } from "./observability/logger.js";
 import { closeRedis, connectRedis } from "./redis/client.js";
 
 async function start(): Promise<void> {
   await connectRedis();
 
   const server = app.listen(config.port, () => {
-    console.log(
-      `Server running in ${config.env} mode on http://localhost:${config.port}`
+    logger.info(
+      {
+        port: config.port,
+        env: config.env,
+        url: `http://localhost:${config.port}`,
+      },
+      "server_started"
     );
   });
 
   async function shutdown(signal: string): Promise<void> {
-    console.log(`Received ${signal}. Shutting down...`);
+    logger.info({ signal }, "shutdown_started");
 
     server.close(async () => {
       try {
         await Promise.all([closePool(), closeRedis()]);
-        console.log("PostgreSQL and Redis closed.");
+        logger.info("shutdown_complete");
         process.exit(0);
       } catch (error) {
-        console.error("Error during shutdown", error);
+        logger.error(
+          { err: error instanceof Error ? error.message : String(error) },
+          "shutdown_failed"
+        );
         process.exit(1);
       }
     });
@@ -37,6 +46,9 @@ async function start(): Promise<void> {
 }
 
 start().catch((error) => {
-  console.error("Failed to start server", error);
+  logger.error(
+    { err: error instanceof Error ? error.message : String(error) },
+    "server_start_failed"
+  );
   process.exit(1);
 });

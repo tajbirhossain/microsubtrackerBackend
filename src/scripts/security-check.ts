@@ -52,6 +52,8 @@ function main(): void {
   assert(appSource.includes("rejectClientUserId"), "identity strip middleware required");
   assert(appSource.includes('disable("x-powered-by")'), "x-powered-by must be disabled");
   assert(appSource.includes("express.json({ limit: \"1mb\""), "JSON body limit required");
+  assert(appSource.includes("requestIdMiddleware"), "request id middleware required");
+  assert(appSource.includes("requestLoggingMiddleware"), "request logging middleware required");
 
   const tokensSource = readFileSync(
     resolve(process.cwd(), "src/utils/tokens.ts"),
