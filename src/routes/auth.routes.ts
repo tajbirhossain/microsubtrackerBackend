@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as authController from "../controllers/auth.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   forgotPasswordSchema,
@@ -13,9 +14,16 @@ import {
   resendOtpSchema,
   resetPasswordSchema,
 } from "../schemas/auth.schemas.js";
+import config from "../config/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
+const authLimiter = rateLimit({
+  max: config.redis.authRateLimitMax,
+  prefix: "rl:auth",
+});
+
+router.use(asyncHandler(authLimiter));
 
 router.post(
   "/register/start",

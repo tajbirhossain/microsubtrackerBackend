@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { checkDatabaseHealth } from "../db/health.js";
+import { checkRedisHealth } from "../redis/health.js";
 
 export function getHealth(_req: Request, res: Response): void {
   res.json({
@@ -15,28 +16,23 @@ export async function getReady(
   next: NextFunction
 ): Promise<void> {
   try {
-    const database = await checkDatabaseHealth();
+    const [database, redisHealth] = await Promise.all([
+      checkDatabaseHealth(),
+      checkRedisHealth(),
+    ]);
 
-    if (!database.ok) {
-      res.status(503).json({
-        success: false,
-        message: "Service not ready",
-        data: {
-          database: "down",
-          latencyMs: database.latencyMs,
-          error: database.error,
-        },
-        timestamp: new Date().toISOString(),
-      });
-      return;
-    }
+    const ready = database.ok && redisHealth.ok;
 
-    res.json({
-      success: true,
-      message: "Service ready",
+    res.status(ready ? 200 : 503).json({
+      success: ready,
+      message: ready ? "Service ready" : "Service not ready",
       data: {
-        database: "up",
-        latencyMs: database.latencyMs,
+        database: database.ok ? "up" : "down",
+        databaseLatencyMs: database.latencyMs,
+        redis: redisHealth.ok ? "up" : "down",
+        redisLatencyMs: redisHealth.latencyMs,
+        ...(database.error ? { databaseError: database.error } : {}),
+        ...(redisHealth.error ? { redisError: redisHealth.error } : {}),
       },
       timestamp: new Date().toISOString(),
     });

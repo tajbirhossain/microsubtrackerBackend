@@ -57,6 +57,28 @@ export function loadConfig(): AppConfig {
       bcryptCost: optionalPositiveInt("BCRYPT_COST", isDev ? 10 : 12),
       appPublicUrl: optionalEnv("APP_PUBLIC_URL", "http://localhost:5000"),
     },
+    redis: {
+      url: requireEnv("REDIS_URL"),
+      keyPrefix: optionalEnv("REDIS_KEY_PREFIX", "mst:"),
+      rateLimitWindowSeconds: optionalPositiveInt(
+        "RATE_LIMIT_WINDOW_SECONDS",
+        60
+      ),
+      rateLimitMax: optionalPositiveInt("RATE_LIMIT_MAX", 120),
+      authRateLimitMax: optionalPositiveInt("AUTH_RATE_LIMIT_MAX", 30),
+      currencyCacheTtlSeconds: optionalPositiveInt(
+        "CURRENCY_CACHE_TTL_SECONDS",
+        60 * 60
+      ),
+      idempotencyTtlSeconds: optionalPositiveInt(
+        "IDEMPOTENCY_TTL_SECONDS",
+        60 * 60 * 24
+      ),
+      sessionTtlSeconds: optionalPositiveInt(
+        "SESSION_CACHE_TTL_SECONDS",
+        60 * 60 * 24 * 30
+      ),
+    },
   };
 }
 

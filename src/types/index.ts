@@ -16,12 +16,24 @@ export interface AuthConfig {
   appPublicUrl: string;
 }
 
+export interface RedisConfig {
+  url: string;
+  keyPrefix: string;
+  rateLimitWindowSeconds: number;
+  rateLimitMax: number;
+  authRateLimitMax: number;
+  currencyCacheTtlSeconds: number;
+  idempotencyTtlSeconds: number;
+  sessionTtlSeconds: number;
+}
+
 export interface AppConfig {
   env: string;
   port: number;
   isDev: boolean;
   database: DatabaseConfig;
   auth: AuthConfig;
+  redis: RedisConfig;
 }
 
 export interface ApiSuccessResponse<T = unknown> {

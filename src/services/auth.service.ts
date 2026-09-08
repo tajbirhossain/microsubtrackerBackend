@@ -47,6 +47,10 @@ import {
   hashToken,
   signAccessToken,
 } from "../utils/tokens.js";
+import {
+  deleteCachedSession,
+  setCachedSession,
+} from "../redis/session.js";
 import { toAuthUser } from "./auth.mapper.js";
 
 type AuthSessionResult = {
@@ -128,17 +132,25 @@ async function issueSession(
   );
 
   const refreshToken = generateOpaqueToken();
+  const tokenHash = hashToken(refreshToken);
   const expiresAt = addSeconds(new Date(), config.auth.refreshTokenTtlSeconds);
 
-  await createRefreshToken(
+  const tokenRow = await createRefreshToken(
     {
       userId: input.userId,
       deviceId: device.id,
-      tokenHash: hashToken(refreshToken),
+      tokenHash,
       expiresAt,
     },
     client
   );
+
+  await setCachedSession(tokenHash, {
+    userId: input.userId,
+    deviceId: device.id,
+    refreshTokenId: tokenRow.id,
+    expiresAt: expiresAt.toISOString(),
+  });
 
   return {
     deviceId: device.id,
@@ -375,10 +387,8 @@ export async function verifyNewDeviceLogin(
 
 export async function refresh(input: RefreshInput): Promise<AuthSessionResult> {
   return withTransaction(async (client) => {
-    const stored = await findActiveRefreshTokenByHash(
-      hashToken(input.refreshToken),
-      client
-    );
+    const oldHash = hashToken(input.refreshToken);
+    const stored = await findActiveRefreshTokenByHash(oldHash, client);
     if (!stored) {
       throw new AppError(401, "Invalid or expired refresh token");
     }
@@ -386,23 +396,33 @@ export async function refresh(input: RefreshInput): Promise<AuthSessionResult> {
     const user = await findActiveUserById(stored.user_id, client);
     if (!user || !stored.device_id) {
       await revokeRefreshTokenById(stored.id, client);
+      await deleteCachedSession(oldHash);
       throw new AppError(401, "Invalid or expired refresh token");
     }
 
     await revokeRefreshTokenById(stored.id, client);
+    await deleteCachedSession(oldHash);
 
     const nextRefreshToken = generateOpaqueToken();
+    const nextHash = hashToken(nextRefreshToken);
     const expiresAt = addSeconds(new Date(), config.auth.refreshTokenTtlSeconds);
 
-    await createRefreshToken(
+    const tokenRow = await createRefreshToken(
       {
         userId: user.id,
         deviceId: stored.device_id,
-        tokenHash: hashToken(nextRefreshToken),
+        tokenHash: nextHash,
         expiresAt,
       },
       client
     );
+
+    await setCachedSession(nextHash, {
+      userId: user.id,
+      deviceId: stored.device_id,
+      refreshTokenId: tokenRow.id,
+      expiresAt: expiresAt.toISOString(),
+    });
 
     return {
       user: toAuthUser(user),
@@ -431,8 +451,10 @@ export async function logout(
     throw new AppError(400, "refreshToken is required unless allDevices is true");
   }
 
-  const stored = await findActiveRefreshTokenByHash(hashToken(input.refreshToken));
+  const tokenHash = hashToken(input.refreshToken);
+  const stored = await findActiveRefreshTokenByHash(tokenHash);
   if (!stored) {
+    await deleteCachedSession(tokenHash);
     return { revoked: false };
   }
 
@@ -441,6 +463,7 @@ export async function logout(
   }
 
   await revokeRefreshTokenById(stored.id);
+  await deleteCachedSession(tokenHash);
   return { revoked: true };
 }
 

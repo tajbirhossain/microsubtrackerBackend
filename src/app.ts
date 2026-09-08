@@ -3,16 +3,17 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import config from "./config/index.js";
-import routes from "./routes/index.js";
+import { rateLimit } from "./middleware/rateLimit.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import routes from "./routes/index.js";
 
 const app = express();
 
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 if (config.isDev) {
   app.use(morgan("dev"));
@@ -26,7 +27,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.use("/api", routes);
+app.use("/api", rateLimit(), routes);
 
 app.use(notFound);
 app.use(errorHandler);
