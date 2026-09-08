@@ -152,6 +152,35 @@ export async function getCalendar(req: Request, res: Response): Promise<void> {
   });
 }
 
+export async function getUnused(req: Request, res: Response): Promise<void> {
+  const minDays = Number(req.query.minDays ?? 30);
+  const result = await subscriptionService.getUnusedSubscriptions(
+    req.user!.id,
+    minDays
+  );
+
+  res.json({
+    success: true,
+    data: result,
+  });
+}
+
+export async function getExpiringTrials(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const days = Number(req.query.days ?? 14);
+  const result = await subscriptionService.getExpiringTrials(
+    req.user!.id,
+    days
+  );
+
+  res.json({
+    success: true,
+    data: result,
+  });
+}
+
 export async function getBurnRate(req: Request, res: Response): Promise<void> {
   const result = await subscriptionService.getBurnRate(req.user!.id);
 

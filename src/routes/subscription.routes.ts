@@ -6,8 +6,10 @@ import {
   calendarQuerySchema,
   createSubscriptionSchema,
   deleteSubscriptionSchema,
+  expiringTrialsQuerySchema,
   listSubscriptionsQuerySchema,
   subscriptionIdParamsSchema,
+  unusedQuerySchema,
   upcomingQuerySchema,
   updateSubscriptionSchema,
 } from "../schemas/subscription.schemas.js";
@@ -44,6 +46,18 @@ router.get(
 router.get(
   "/burn-rate",
   asyncHandler(subscriptionController.getBurnRate)
+);
+
+router.get(
+  "/unused",
+  validateRequest(unusedQuerySchema, "query"),
+  asyncHandler(subscriptionController.getUnused)
+);
+
+router.get(
+  "/expiring-trials",
+  validateRequest(expiringTrialsQuerySchema, "query"),
+  asyncHandler(subscriptionController.getExpiringTrials)
 );
 
 router.get(

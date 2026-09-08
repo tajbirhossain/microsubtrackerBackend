@@ -352,3 +352,78 @@ export async function listActiveForBurnRate(
   );
   return result.rows;
 }
+
+/** Active subs quiet for at least `minDays` (computed live from last_used_at / created_at). */
+export async function listUnusedForUser(
+  userId: string,
+  minDays: number,
+  client?: Queryable
+): Promise<SubscriptionWithCategory[]> {
+  const result = await query<SubscriptionWithCategory>(
+    `
+      ${SELECT_WITH_CATEGORY}
+      WHERE s.user_id = $1
+        AND s.status = 'active'
+        AND GREATEST(
+          0,
+          (CURRENT_DATE - COALESCE(s.last_used_at::date, s.created_at::date))
+        ) >= $2
+      ORDER BY
+        GREATEST(
+          0,
+          (CURRENT_DATE - COALESCE(s.last_used_at::date, s.created_at::date))
+        ) DESC,
+        s.name ASC
+    `,
+    [userId, minDays],
+    client
+  );
+  return result.rows;
+}
+
+/** Active trials ending within the next `days` (inclusive of today). */
+export async function listExpiringTrialsForUser(
+  userId: string,
+  days: number,
+  client?: Queryable
+): Promise<SubscriptionWithCategory[]> {
+  const result = await query<SubscriptionWithCategory>(
+    `
+      ${SELECT_WITH_CATEGORY}
+      WHERE s.user_id = $1
+        AND s.status = 'active'
+        AND s.is_trial = TRUE
+        AND s.trial_ends_at IS NOT NULL
+        AND s.trial_ends_at >= CURRENT_DATE
+        AND s.trial_ends_at <= (CURRENT_DATE + ($2::text || ' days')::interval)::date
+      ORDER BY s.trial_ends_at ASC, s.name ASC
+    `,
+    [userId, days],
+    client
+  );
+  return result.rows;
+}
+
+/** Active trials whose trial_ends_at falls in a given calendar month. */
+export async function listTrialEndsForCalendarMonth(
+  userId: string,
+  year: number,
+  month: number,
+  client?: Queryable
+): Promise<SubscriptionWithCategory[]> {
+  const result = await query<SubscriptionWithCategory>(
+    `
+      ${SELECT_WITH_CATEGORY}
+      WHERE s.user_id = $1
+        AND s.status IN ('active', 'paused')
+        AND s.is_trial = TRUE
+        AND s.trial_ends_at IS NOT NULL
+        AND EXTRACT(YEAR FROM s.trial_ends_at) = $2
+        AND EXTRACT(MONTH FROM s.trial_ends_at) = $3
+      ORDER BY s.trial_ends_at ASC, s.name ASC
+    `,
+    [userId, year, month],
+    client
+  );
+  return result.rows;
+}

@@ -7,8 +7,11 @@ import {
   findSubscriptionForUser,
   listActiveForBurnRate,
   listCalendarForUser,
+  listExpiringTrialsForUser,
   listSubscriptionsForUser,
+  listTrialEndsForCalendarMonth,
   listUpcomingForUser,
+  listUnusedForUser,
   lockSubscriptionForUser,
   updateSubscriptionForUser,
 } from "../repositories/subscription.repository.js";
@@ -18,6 +21,7 @@ import type {
   UpdateSubscriptionInput,
 } from "../schemas/subscription.schemas.js";
 import type { PaginatedResult } from "../types/index.js";
+import { daysUntil, liveUnusedDays } from "../utils/dates.js";
 import { AppError } from "../utils/errors.js";
 import {
   roundMoney,
@@ -29,6 +33,19 @@ import {
   toSubscriptionView,
   type SubscriptionView,
 } from "./subscription.mapper.js";
+
+export type UpcomingItem = SubscriptionView & { daysUntil: number };
+export type UnusedItem = SubscriptionView & {
+  unusedDays: number;
+  quietMonthly: number;
+};
+export type ExpiringTrialItem = SubscriptionView & { daysLeft: number };
+
+export type CalendarDay = {
+  date: string;
+  renewals: SubscriptionView[];
+  trialEnds: SubscriptionView[];
+};
 
 async function resolveCategoryId(
   userId: string,
@@ -317,11 +334,33 @@ export async function deleteUserSubscription(
 export async function getUpcomingSubscriptions(
   userId: string,
   days: number
-): Promise<{ days: number; items: SubscriptionView[] }> {
+): Promise<{
+  days: number;
+  count: number;
+  monthlyTotal: number;
+  currency: string;
+  items: UpcomingItem[];
+}> {
   const rows = await listUpcomingForUser(userId, days);
+  const items: UpcomingItem[] = rows.map((row) => {
+    const view = toSubscriptionView(row);
+    return {
+      ...view,
+      daysUntil: daysUntil(view.nextBillingDate) ?? 0,
+    };
+  });
+
+  const monthlyTotal = items.reduce(
+    (sum, item) => sum + toMonthlyAmount(item.amount, item.billingCycle),
+    0
+  );
+
   return {
     days,
-    items: rows.map(toSubscriptionView),
+    count: items.length,
+    monthlyTotal: roundMoney(monthlyTotal),
+    currency: items[0]?.currency ?? "USD",
+    items,
   };
 }
 
@@ -332,24 +371,100 @@ export async function getCalendarSubscriptions(
 ): Promise<{
   year: number;
   month: number;
-  days: Array<{ date: string; items: SubscriptionView[] }>;
+  renewalCount: number;
+  trialEndCount: number;
+  days: CalendarDay[];
 }> {
-  const rows = await listCalendarForUser(userId, year, month);
-  const grouped = new Map<string, SubscriptionView[]>();
+  const [renewalRows, trialRows] = await Promise.all([
+    listCalendarForUser(userId, year, month),
+    listTrialEndsForCalendarMonth(userId, year, month),
+  ]);
 
-  for (const row of rows) {
-    const date = row.next_billing_date;
-    if (!date) continue;
-    const list = grouped.get(date) ?? [];
-    list.push(toSubscriptionView(row));
-    grouped.set(date, list);
+  const byDate = new Map<string, CalendarDay>();
+
+  const ensureDay = (date: string): CalendarDay => {
+    const existing = byDate.get(date);
+    if (existing) return existing;
+    const created: CalendarDay = { date, renewals: [], trialEnds: [] };
+    byDate.set(date, created);
+    return created;
+  };
+
+  for (const row of renewalRows) {
+    if (!row.next_billing_date) continue;
+    ensureDay(row.next_billing_date).renewals.push(toSubscriptionView(row));
   }
 
-  const days = [...grouped.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, items]) => ({ date, items }));
+  for (const row of trialRows) {
+    if (!row.trial_ends_at) continue;
+    ensureDay(row.trial_ends_at).trialEnds.push(toSubscriptionView(row));
+  }
 
-  return { year, month, days };
+  const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    year,
+    month,
+    renewalCount: renewalRows.length,
+    trialEndCount: trialRows.length,
+    days,
+  };
+}
+
+export async function getUnusedSubscriptions(
+  userId: string,
+  minDays: number
+): Promise<{
+  minDays: number;
+  count: number;
+  quietMonthlyTotal: number;
+  currency: string;
+  items: UnusedItem[];
+}> {
+  const rows = await listUnusedForUser(userId, minDays);
+  const items: UnusedItem[] = rows.map((row) => {
+    const view = toSubscriptionView(row);
+    const unused = liveUnusedDays(view.lastUsedAt, view.createdAt);
+    return {
+      ...view,
+      unusedDays: unused,
+      quietMonthly: roundMoney(toMonthlyAmount(view.amount, view.billingCycle)),
+    };
+  });
+
+  const quietMonthlyTotal = items.reduce((sum, item) => sum + item.quietMonthly, 0);
+
+  return {
+    minDays,
+    count: items.length,
+    quietMonthlyTotal: roundMoney(quietMonthlyTotal),
+    currency: items[0]?.currency ?? "USD",
+    items,
+  };
+}
+
+export async function getExpiringTrials(
+  userId: string,
+  days: number
+): Promise<{
+  days: number;
+  count: number;
+  items: ExpiringTrialItem[];
+}> {
+  const rows = await listExpiringTrialsForUser(userId, days);
+  const items: ExpiringTrialItem[] = rows.map((row) => {
+    const view = toSubscriptionView(row);
+    return {
+      ...view,
+      daysLeft: daysUntil(view.trialEndsAt) ?? 0,
+    };
+  });
+
+  return {
+    days,
+    count: items.length,
+    items,
+  };
 }
 
 export async function getBurnRate(
@@ -369,12 +484,38 @@ export async function getBurnRate(
     micro: { monthlyTotal: number; count: number };
     macro: { monthlyTotal: number; count: number };
   };
+  unused: {
+    count: number;
+    monthlyWaste: number;
+    minDays: number;
+  };
+  trials: {
+    activeCount: number;
+    expiringSoonCount: number;
+    windowDays: number;
+  };
+  upcoming: {
+    count: number;
+    windowDays: number;
+    monthlyTotal: number;
+  };
 }> {
-  const rows = await listActiveForBurnRate(userId);
+  const UNUSED_MIN_DAYS = 30;
+  const TRIAL_WINDOW_DAYS = 14;
+  const UPCOMING_WINDOW_DAYS = 30;
+
+  const [rows, unusedRows, trialRows, upcomingRows] = await Promise.all([
+    listActiveForBurnRate(userId),
+    listUnusedForUser(userId, UNUSED_MIN_DAYS),
+    listExpiringTrialsForUser(userId, TRIAL_WINDOW_DAYS),
+    listUpcomingForUser(userId, UPCOMING_WINDOW_DAYS),
+  ]);
+
   const items = rows.map(toSubscriptionView);
 
   let monthlyTotal = 0;
   let yearlyTotal = 0;
+  let activeTrialCount = 0;
   const categoryMap = new Map<
     string,
     { monthlyTotal: number; yearlyTotal: number; count: number }
@@ -390,6 +531,10 @@ export async function getBurnRate(
     monthlyTotal += monthly;
     yearlyTotal += yearly;
 
+    if (item.isTrial) {
+      activeTrialCount += 1;
+    }
+
     const categoryName = item.category?.name ?? "Uncategorized";
     const bucket = categoryMap.get(categoryName) ?? {
       monthlyTotal: 0,
@@ -404,6 +549,16 @@ export async function getBurnRate(
     byScale[item.scale].monthlyTotal += monthly;
     byScale[item.scale].count += 1;
   }
+
+  const unusedMonthlyWaste = unusedRows.reduce((sum, row) => {
+    const view = toSubscriptionView(row);
+    return sum + toMonthlyAmount(view.amount, view.billingCycle);
+  }, 0);
+
+  const upcomingMonthly = upcomingRows.reduce((sum, row) => {
+    const view = toSubscriptionView(row);
+    return sum + toMonthlyAmount(view.amount, view.billingCycle);
+  }, 0);
 
   const dominantCurrency = items[0]?.currency ?? "USD";
 
@@ -429,6 +584,21 @@ export async function getBurnRate(
         monthlyTotal: roundMoney(byScale.macro.monthlyTotal),
         count: byScale.macro.count,
       },
+    },
+    unused: {
+      count: unusedRows.length,
+      monthlyWaste: roundMoney(unusedMonthlyWaste),
+      minDays: UNUSED_MIN_DAYS,
+    },
+    trials: {
+      activeCount: activeTrialCount,
+      expiringSoonCount: trialRows.length,
+      windowDays: TRIAL_WINDOW_DAYS,
+    },
+    upcoming: {
+      count: upcomingRows.length,
+      windowDays: UPCOMING_WINDOW_DAYS,
+      monthlyTotal: roundMoney(upcomingMonthly),
     },
   };
 }

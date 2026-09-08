@@ -103,6 +103,15 @@ export const calendarQuerySchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
 });
 
+/** Matches frontend ghost threshold (`unusedDays >= 30`) and ghost-detection job. */
+export const unusedQuerySchema = z.object({
+  minDays: z.coerce.number().int().min(1).max(365).optional().default(30),
+});
+
+export const expiringTrialsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional().default(14),
+});
+
 export const subscriptionIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -118,3 +127,5 @@ export type DeleteSubscriptionInput = z.infer<typeof deleteSubscriptionSchema>;
 export type ListSubscriptionsQuery = z.infer<typeof listSubscriptionsQuerySchema>;
 export type UpcomingQuery = z.infer<typeof upcomingQuerySchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
+export type UnusedQuery = z.infer<typeof unusedQuerySchema>;
+export type ExpiringTrialsQuery = z.infer<typeof expiringTrialsQuerySchema>;
