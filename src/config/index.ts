@@ -29,10 +29,34 @@ function optionalPositiveInt(name: string, fallback: number): number {
   return parsed;
 }
 
+function requireSecret(name: string, minLength = 32): string {
+  const value = requireEnv(name);
+  if (value.length < minLength) {
+    throw new Error(`${name} must be at least ${minLength} characters`);
+  }
+  return value;
+}
+
+function parseCorsOrigins(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 export function loadConfig(): AppConfig {
   const env = process.env.NODE_ENV ?? "development";
   const isDev = env === "development";
-  const accessTokenSecret = requireEnv("JWT_ACCESS_SECRET");
+  const accessTokenSecret = requireSecret("JWT_ACCESS_SECRET");
+  const refreshRaw = process.env.JWT_REFRESH_SECRET?.trim();
+  const refreshTokenSecret =
+    refreshRaw && refreshRaw.length > 0
+      ? refreshRaw.length >= 32
+        ? refreshRaw
+        : (() => {
+            throw new Error("JWT_REFRESH_SECRET must be at least 32 characters");
+          })()
+      : accessTokenSecret;
 
   return {
     env,
@@ -46,7 +70,7 @@ export function loadConfig(): AppConfig {
     },
     auth: {
       accessTokenSecret,
-      refreshTokenSecret: optionalEnv("JWT_REFRESH_SECRET", accessTokenSecret),
+      refreshTokenSecret,
       accessTokenTtlSeconds: optionalPositiveInt("ACCESS_TOKEN_TTL_SECONDS", 900),
       refreshTokenTtlSeconds: optionalPositiveInt(
         "REFRESH_TOKEN_TTL_SECONDS",
@@ -83,6 +107,21 @@ export function loadConfig(): AppConfig {
       concurrency: optionalPositiveInt("JOB_CONCURRENCY", 5),
       attempts: optionalPositiveInt("JOB_ATTEMPTS", 5),
       backoffMs: optionalPositiveInt("JOB_BACKOFF_MS", 2000),
+    },
+    push: {
+      expoAccessToken: optionalEnv("EXPO_ACCESS_TOKEN", "") || null,
+      forceLog:
+        optionalEnv("PUSH_FORCE_LOG", isDev ? "true" : "false").toLowerCase() ===
+        "true",
+    },
+    security: {
+      corsOrigins: parseCorsOrigins(
+        optionalEnv("CORS_ORIGINS", isDev ? "*" : "*")
+      ),
+      trustProxy:
+        optionalEnv("TRUST_PROXY", isDev ? "false" : "true").toLowerCase() ===
+        "true",
+      userRateLimitMax: optionalPositiveInt("USER_RATE_LIMIT_MAX", 180),
     },
   };
 }

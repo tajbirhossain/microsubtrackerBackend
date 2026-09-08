@@ -8,6 +8,8 @@ export {
   enqueueCurrencyRateUpdate,
   enqueueMonthlyCalculations,
   enqueueExpiredSessionCleanup,
+  enqueueWeeklySummary,
+  enqueueUpcomingWeekDigest,
   enqueueNotification,
   registerRepeatableSchedulers,
 } from "./producers.js";

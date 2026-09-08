@@ -19,6 +19,7 @@ export function generateOtpCode(): string {
 export function signAccessToken(payload: Omit<AccessTokenPayload, "typ">): string {
   const options: SignOptions = {
     expiresIn: config.auth.accessTokenTtlSeconds,
+    algorithm: "HS256",
   };
 
   return jwt.sign(
@@ -30,7 +31,9 @@ export function signAccessToken(payload: Omit<AccessTokenPayload, "typ">): strin
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
   try {
-    const decoded = jwt.verify(token, config.auth.accessTokenSecret);
+    const decoded = jwt.verify(token, config.auth.accessTokenSecret, {
+      algorithms: ["HS256"],
+    });
 
     if (
       typeof decoded !== "object" ||

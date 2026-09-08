@@ -33,6 +33,7 @@ export const createSubscriptionSchema = z
     icon: z.string().trim().min(1).max(16).optional(),
     cancellationNotes: z.string().trim().max(500).optional(),
   })
+  .strict()
   .superRefine((value, ctx) => {
     if (value.isTrial && !value.trialEndsAt) {
       ctx.addIssue({
@@ -77,6 +78,7 @@ export const updateSubscriptionSchema = z
     cancellationNotes: z.string().trim().max(500).nullable().optional(),
     version: z.coerce.number().int().positive(),
   })
+  .strict()
   .refine((value) => Object.keys(value).some((key) => key !== "version"), {
     message: "At least one field besides version is required",
   });
@@ -116,10 +118,12 @@ export const subscriptionIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
-export const deleteSubscriptionSchema = z.object({
-  version: z.coerce.number().int().positive(),
-  cancellationNotes: z.string().trim().max(500).optional(),
-});
+export const deleteSubscriptionSchema = z
+  .object({
+    version: z.coerce.number().int().positive(),
+    cancellationNotes: z.string().trim().max(500).optional(),
+  })
+  .strict();
 
 export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;

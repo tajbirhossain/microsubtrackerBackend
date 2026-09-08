@@ -1,7 +1,9 @@
 import { query, queryAll } from "../db/query.js";
-import { setCachedCurrencyRates } from "../redis/currency-cache.js";
 import { createSubscriptionEvent } from "../repositories/subscription-event.repository.js";
 import { revokeExpiredRefreshTokens } from "../repositories/refresh-token.repository.js";
+import { listUsersWithPreferenceEnabled } from "../repositories/notification-preferences.repository.js";
+import { processNotificationDelivery } from "../services/notification.service.js";
+import { refreshCurrencyRates } from "../services/currency.service.js";
 import {
   roundMoney,
   toMonthlyAmount,
@@ -17,6 +19,7 @@ type ReminderRow = {
   name: string;
   amount: string;
   currency: string;
+  billing_cycle: BillingCycle;
   next_billing_date: string | null;
   trial_ends_at: string | null;
   unused_days: number | null;
@@ -29,12 +32,23 @@ function todayKey(): string {
 export async function handleTrialReminders(): Promise<{ enqueued: number }> {
   const rows = await queryAll<ReminderRow>(
     `
-      SELECT id, user_id, name, amount, currency, next_billing_date, trial_ends_at, unused_days
-      FROM subscriptions
-      WHERE status = 'active'
-        AND is_trial = TRUE
-        AND trial_ends_at IS NOT NULL
-        AND trial_ends_at BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '3 days')
+      SELECT
+        s.id,
+        s.user_id,
+        s.name,
+        s.amount,
+        s.currency,
+        s.billing_cycle,
+        s.next_billing_date,
+        s.trial_ends_at,
+        s.unused_days
+      FROM subscriptions s
+      LEFT JOIN notification_preferences np ON np.user_id = s.user_id
+      WHERE s.status = 'active'
+        AND s.is_trial = TRUE
+        AND s.trial_ends_at IS NOT NULL
+        AND s.trial_ends_at BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '3 days')
+        AND COALESCE(np.trials_enabled, TRUE) = TRUE
     `
   );
 
@@ -65,11 +79,22 @@ export async function handleTrialReminders(): Promise<{ enqueued: number }> {
 export async function handleRenewalReminders(): Promise<{ enqueued: number }> {
   const rows = await queryAll<ReminderRow>(
     `
-      SELECT id, user_id, name, amount, currency, next_billing_date, trial_ends_at, unused_days
-      FROM subscriptions
-      WHERE status = 'active'
-        AND next_billing_date IS NOT NULL
-        AND next_billing_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '2 days')
+      SELECT
+        s.id,
+        s.user_id,
+        s.name,
+        s.amount,
+        s.currency,
+        s.billing_cycle,
+        s.next_billing_date,
+        s.trial_ends_at,
+        s.unused_days
+      FROM subscriptions s
+      LEFT JOIN notification_preferences np ON np.user_id = s.user_id
+      WHERE s.status = 'active'
+        AND s.next_billing_date IS NOT NULL
+        AND s.next_billing_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '2 days')
+        AND COALESCE(np.renewals_enabled, TRUE) = TRUE
     `
   );
 
@@ -106,9 +131,14 @@ export async function handleGhostDetection(): Promise<{
     `
   );
 
-  const ghosts = (result.rows as ReminderRow[]).filter(
-    (row) => (row.unused_days ?? 0) >= 30
-  );
+  const ghosts = (result.rows as Array<{
+    id: string;
+    user_id: string;
+    name: string;
+    amount: string;
+    currency: string;
+    unused_days: number | null;
+  }>).filter((row) => (row.unused_days ?? 0) >= 30);
 
   let enqueued = 0;
   for (const row of ghosts) {
@@ -133,41 +163,111 @@ export async function handleGhostDetection(): Promise<{
   return { updated: result.rowCount ?? 0, enqueued };
 }
 
+export async function handleWeeklySummary(): Promise<{ enqueued: number }> {
+  const userIds = await listUsersWithPreferenceEnabled("weekly_summary_enabled");
+  let enqueued = 0;
+
+  for (const userId of userIds) {
+    const rows = await queryAll<{
+      amount: string;
+      billing_cycle: BillingCycle;
+      currency: string;
+    }>(
+      `
+        SELECT amount, billing_cycle, currency
+        FROM subscriptions
+        WHERE user_id = $1
+          AND status = 'active'
+      `,
+      [userId]
+    );
+
+    if (rows.length === 0) continue;
+
+    const monthly = rows.reduce(
+      (sum, row) => sum + toMonthlyAmount(Number(row.amount), row.billing_cycle),
+      0
+    );
+    const currency = rows[0]?.currency ?? "USD";
+
+    await enqueueNotification({
+      userId,
+      subscriptionId: null,
+      type: "weekly_summary",
+      title: "Weekly spend summary",
+      body: `This week's burn: ${currency} ${roundMoney(monthly)} across ${rows.length} plan${rows.length === 1 ? "" : "s"}`,
+      dedupeKey: `weekly_summary:${userId}:${todayKey()}`,
+    });
+    enqueued += 1;
+  }
+
+  return { enqueued };
+}
+
+export async function handleUpcomingWeekDigest(): Promise<{ enqueued: number }> {
+  const userIds = await listUsersWithPreferenceEnabled("upcoming_week_enabled");
+  let enqueued = 0;
+
+  for (const userId of userIds) {
+    const rows = await queryAll<{ name: string }>(
+      `
+        SELECT name
+        FROM subscriptions
+        WHERE user_id = $1
+          AND status = 'active'
+          AND next_billing_date IS NOT NULL
+          AND next_billing_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')
+        ORDER BY next_billing_date ASC
+      `,
+      [userId]
+    );
+
+    if (rows.length === 0) continue;
+
+    await enqueueNotification({
+      userId,
+      subscriptionId: null,
+      type: "upcoming_week",
+      title: "Upcoming this week",
+      body:
+        rows.length === 1
+          ? `${rows[0]!.name} renews within 7 days`
+          : `${rows.length} renewals land within 7 days`,
+      dedupeKey: `upcoming_week:${userId}:${todayKey()}`,
+    });
+    enqueued += 1;
+  }
+
+  return { enqueued };
+}
+
 export async function handleCurrencyRateUpdate(): Promise<{
   base: string;
   count: number;
+  source: string;
+  fallback: boolean;
+  fetchedAt: string;
 }> {
-  // Placeholder rates until section 11 wires an external API.
-  const rates: Record<string, number> = {
-    EUR: 0.92,
-    GBP: 0.79,
-    CAD: 1.36,
-    AUD: 1.53,
-    INR: 83.2,
-    BDT: 109.5,
-    JPY: 149.8,
-    SGD: 1.34,
-    AED: 3.67,
-  };
-
-  await setCachedCurrencyRates({
-    base: "USD",
-    rates,
-    fetchedAt: new Date().toISOString(),
-    source: "worker-placeholder",
-  });
-
-  return { base: "USD", count: Object.keys(rates).length };
+  const result = await refreshCurrencyRates();
+  console.info(
+    `[currency] refreshed base=${result.base} count=${result.count} source=${result.source} fallback=${result.fallback}`
+  );
+  return result;
 }
 
 export async function handleProcessNotification(
   data: NotificationJobData
-): Promise<{ delivered: boolean }> {
-  // Push delivery lands in section 10; for now we record intent + log.
-  console.info(
-    `[notify:${data.type}] user=${data.userId} sub=${data.subscriptionId} ${data.title} — ${data.body}`
-  );
-  return { delivered: true };
+): Promise<Awaited<ReturnType<typeof processNotificationDelivery>>> {
+  const result = await processNotificationDelivery(data);
+
+  if (result.skipReason === "quiet_hours" && result.delayedMs) {
+    await enqueueNotification(data, { delayMs: result.delayedMs });
+    console.info(
+      `[notify:${data.type}] quiet-hours delay=${result.delayedMs}ms user=${data.userId}`
+    );
+  }
+
+  return result;
 }
 
 export async function handleMonthlyCalculations(): Promise<{

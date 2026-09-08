@@ -39,7 +39,7 @@ import type {
 } from "../schemas/auth.schemas.js";
 import type { AuthTokens, AuthUser, OtpPurpose } from "../types/index.js";
 import { AppError } from "../utils/errors.js";
-import { hashPassword, verifyPassword } from "../utils/password.js";
+import { hashPassword, TIMING_SAFE_DUMMY_HASH, verifyPassword } from "../utils/password.js";
 import {
   addSeconds,
   generateOpaqueToken,
@@ -303,6 +303,7 @@ export async function login(
 ): Promise<AuthSessionResult | OtpSentResult> {
   const user = await findActiveUserByPhone(input.phone);
   if (!user) {
+    await verifyPassword(input.password, TIMING_SAFE_DUMMY_HASH);
     throw new AppError(401, "Invalid phone number or password");
   }
 

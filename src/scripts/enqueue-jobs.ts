@@ -6,6 +6,8 @@ import {
   enqueueMonthlyCalculations,
   enqueueRenewalReminders,
   enqueueTrialReminders,
+  enqueueUpcomingWeekDigest,
+  enqueueWeeklySummary,
 } from "../jobs/producers.js";
 import { closeQueue } from "../jobs/queues.js";
 import { closeRedis, connectRedis } from "../redis/client.js";
@@ -17,6 +19,8 @@ async function main(): Promise<void> {
     enqueueTrialReminders(),
     enqueueRenewalReminders(),
     enqueueGhostDetection(),
+    enqueueWeeklySummary(),
+    enqueueUpcomingWeekDigest(),
     enqueueCurrencyRateUpdate(),
     enqueueMonthlyCalculations(),
     enqueueExpiredSessionCleanup(),

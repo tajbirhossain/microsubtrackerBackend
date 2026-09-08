@@ -61,11 +61,33 @@ export async function enqueueExpiredSessionCleanup(): Promise<string | undefined
   return job.id;
 }
 
+export async function enqueueWeeklySummary(): Promise<string | undefined> {
+  const job = await appQueue.add(
+    JobName.WeeklySummary,
+    {},
+    { jobId: `${JobName.WeeklySummary}:${todayKey()}` }
+  );
+  return job.id;
+}
+
+export async function enqueueUpcomingWeekDigest(): Promise<string | undefined> {
+  const job = await appQueue.add(
+    JobName.UpcomingWeekDigest,
+    {},
+    { jobId: `${JobName.UpcomingWeekDigest}:${todayKey()}` }
+  );
+  return job.id;
+}
+
 export async function enqueueNotification(
-  data: NotificationJobData
+  data: NotificationJobData,
+  options: { delayMs?: number } = {}
 ): Promise<string | undefined> {
   const job = await appQueue.add(JobName.ProcessNotification, data, {
-    jobId: `notify:${data.dedupeKey}`,
+    jobId: options.delayMs
+      ? `notify:${data.dedupeKey}:d${Date.now()}`
+      : `notify:${data.dedupeKey}`,
+    delay: options.delayMs,
   });
   return job.id;
 }
@@ -87,6 +109,18 @@ export async function registerRepeatableSchedulers(): Promise<void> {
     "scheduler:ghost-detection",
     { pattern: "0 10 * * *" },
     { name: JobName.GhostDetection, data: {} }
+  );
+
+  await appQueue.upsertJobScheduler(
+    "scheduler:weekly-summary",
+    { pattern: "0 9 * * 1" },
+    { name: JobName.WeeklySummary, data: {} }
+  );
+
+  await appQueue.upsertJobScheduler(
+    "scheduler:upcoming-week",
+    { pattern: "0 18 * * 0" },
+    { name: JobName.UpcomingWeekDigest, data: {} }
   );
 
   await appQueue.upsertJobScheduler(

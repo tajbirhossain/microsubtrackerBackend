@@ -3,6 +3,7 @@ import { findActiveUserById } from "../repositories/user.repository.js";
 import { toAuthUser } from "../services/auth.mapper.js";
 import { AppError } from "../utils/errors.js";
 import { verifyAccessToken } from "../utils/tokens.js";
+import { userRateLimit } from "./rateLimit.js";
 
 declare global {
   namespace Express {
@@ -45,12 +46,12 @@ async function attachUserFromAccessToken(req: Request): Promise<void> {
 
 export async function requireAuth(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
     await attachUserFromAccessToken(req);
-    next();
+    await userRateLimit()(req, res, next);
   } catch (error) {
     next(error);
   }

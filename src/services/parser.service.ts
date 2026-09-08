@@ -12,6 +12,7 @@ import type {
   ListParserQuery,
 } from "../schemas/parser.schemas.js";
 import { AppError } from "../utils/errors.js";
+import { assertFound } from "../security/ownership.js";
 import {
   toParserEventView,
   type ParserEventView,
@@ -105,10 +106,10 @@ export async function getParserEvent(
   userId: string,
   eventId: string
 ): Promise<ParserEventView> {
-  const row = await findParserEventForUser(userId, eventId);
-  if (!row) {
-    throw new AppError(404, "Parser event not found");
-  }
+  const row = assertFound(
+    await findParserEventForUser(userId, eventId),
+    "Parser event not found"
+  );
   return toParserEventView(row);
 }
 

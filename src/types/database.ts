@@ -2,6 +2,8 @@ import type {
   AuditActorType,
   BillingCycle,
   DevicePlatform,
+  NotificationDeliveryStatus,
+  NotificationType,
   OtpPurpose,
   ParserEventStatus,
   ParserSourceType,
@@ -101,6 +103,22 @@ export interface NotificationPreferencesRow {
   timezone: string;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface NotificationDeliveryRow {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  type: NotificationType;
+  title: string;
+  body: string;
+  dedupe_key: string;
+  status: NotificationDeliveryStatus;
+  skip_reason: string | null;
+  provider: string | null;
+  results: unknown;
+  created_at: Date;
+  completed_at: Date | null;
 }
 
 export interface CurrencyRateRow {

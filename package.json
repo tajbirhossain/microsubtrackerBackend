@@ -14,7 +14,9 @@
     "worker": "tsx src/scripts/worker.ts",
     "worker:prod": "node dist/scripts/worker.js",
     "jobs:enqueue": "tsx src/scripts/enqueue-jobs.ts",
-    "parser:test": "tsx src/scripts/test-parser.ts"
+    "parser:test": "tsx src/scripts/test-parser.ts",
+    "currency:test": "tsx src/scripts/test-currency.ts",
+    "security:check": "tsx src/scripts/security-check.ts"
   },
   "keywords": [
     "express",

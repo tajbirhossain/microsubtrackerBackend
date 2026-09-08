@@ -1,5 +1,5 @@
 import type { Queryable } from "../db/query.js";
-import { queryOne } from "../db/query.js";
+import { queryAll, queryOne } from "../db/query.js";
 import type { DeviceRow } from "../types/database.js";
 import type { DevicePlatform } from "../types/index.js";
 
@@ -65,6 +65,44 @@ export async function findDeviceByUserAndKey(
       LIMIT 1
     `,
     [userId, deviceKey],
+    client
+  );
+}
+
+export async function updatePushTokenForDevice(
+  userId: string,
+  deviceKey: string,
+  pushToken: string | null,
+  client?: Queryable
+): Promise<DeviceRow | null> {
+  return queryOne<DeviceRow>(
+    `
+      UPDATE devices
+      SET push_token = $3,
+          last_seen_at = NOW()
+      WHERE user_id = $1
+        AND device_key = $2
+      RETURNING *
+    `,
+    [userId, deviceKey, pushToken],
+    client
+  );
+}
+
+export async function listDevicesWithPushToken(
+  userId: string,
+  client?: Queryable
+): Promise<DeviceRow[]> {
+  return queryAll<DeviceRow>(
+    `
+      SELECT *
+      FROM devices
+      WHERE user_id = $1
+        AND push_token IS NOT NULL
+        AND char_length(trim(push_token)) > 0
+      ORDER BY last_seen_at DESC
+    `,
+    [userId],
     client
   );
 }

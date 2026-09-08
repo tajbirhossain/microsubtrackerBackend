@@ -33,6 +33,17 @@ export interface JobsConfig {
   backoffMs: number;
 }
 
+export interface PushConfig {
+  expoAccessToken: string | null;
+  forceLog: boolean;
+}
+
+export interface SecurityConfig {
+  corsOrigins: string[];
+  trustProxy: boolean;
+  userRateLimitMax: number;
+}
+
 export interface AppConfig {
   env: string;
   port: number;
@@ -41,6 +52,8 @@ export interface AppConfig {
   auth: AuthConfig;
   redis: RedisConfig;
   jobs: JobsConfig;
+  push: PushConfig;
+  security: SecurityConfig;
 }
 
 export interface ApiSuccessResponse<T = unknown> {
@@ -73,6 +86,17 @@ export type ParserEventStatus =
   | "rejected"
   | "failed";
 export type AuditActorType = "user" | "system" | "worker";
+export type NotificationType =
+  | "trial"
+  | "renewal"
+  | "ghost"
+  | "weekly_summary"
+  | "upcoming_week";
+export type NotificationDeliveryStatus =
+  | "sent"
+  | "partial"
+  | "failed"
+  | "skipped";
 
 export type SubscriptionEventType =
   | "created"
@@ -137,6 +161,7 @@ export type {
   DeviceRow,
   RefreshTokenRow,
   NotificationPreferencesRow,
+  NotificationDeliveryRow,
   CurrencyRateRow,
   ParserEventRow,
   AuditLogRow,

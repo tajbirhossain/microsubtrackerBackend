@@ -23,6 +23,7 @@ import type {
 import type { PaginatedResult } from "../types/index.js";
 import { daysUntil, liveUnusedDays } from "../utils/dates.js";
 import { AppError } from "../utils/errors.js";
+import { assertFound } from "../security/ownership.js";
 import {
   roundMoney,
   scaleForAmount,
@@ -181,10 +182,10 @@ export async function getUserSubscription(
   userId: string,
   subscriptionId: string
 ): Promise<SubscriptionView> {
-  const row = await findSubscriptionForUser(userId, subscriptionId);
-  if (!row) {
-    throw new AppError(404, "Subscription not found");
-  }
+  const row = assertFound(
+    await findSubscriptionForUser(userId, subscriptionId),
+    "Subscription not found"
+  );
   return toSubscriptionView(row);
 }
 

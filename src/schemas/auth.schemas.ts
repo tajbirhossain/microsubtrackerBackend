@@ -21,60 +21,78 @@ export const deviceSchema = z.object({
   appVersion: z.string().trim().min(1).max(64).optional(),
 });
 
-export const registerStartSchema = z.object({
-  phone: phoneSchema,
-  password: z.string().min(8).max(128),
-  displayName: z.string().trim().min(1).max(80).optional(),
-  preferredCurrency: z
-    .string()
-    .trim()
-    .length(3)
-    .transform((value) => value.toUpperCase())
-    .optional(),
-  device: deviceSchema,
-});
+export const registerStartSchema = z
+  .object({
+    phone: phoneSchema,
+    password: z.string().min(8).max(72),
+    displayName: z.string().trim().min(1).max(80).optional(),
+    preferredCurrency: z
+      .string()
+      .trim()
+      .length(3)
+      .transform((value) => value.toUpperCase())
+      .optional(),
+    device: deviceSchema,
+  })
+  .strict();
 
-export const registerVerifySchema = z.object({
-  phone: phoneSchema,
-  code: otpCodeSchema,
-  device: deviceSchema,
-});
+export const registerVerifySchema = z
+  .object({
+    phone: phoneSchema,
+    code: otpCodeSchema,
+    device: deviceSchema,
+  })
+  .strict();
 
-export const loginSchema = z.object({
-  phone: phoneSchema,
-  password: z.string().min(1).max(128),
-  device: deviceSchema,
-});
+export const loginSchema = z
+  .object({
+    phone: phoneSchema,
+    password: z.string().min(1).max(72),
+    device: deviceSchema,
+  })
+  .strict();
 
-export const loginVerifyDeviceSchema = z.object({
-  phone: phoneSchema,
-  code: otpCodeSchema,
-  device: deviceSchema,
-});
+export const loginVerifyDeviceSchema = z
+  .object({
+    phone: phoneSchema,
+    code: otpCodeSchema,
+    device: deviceSchema,
+  })
+  .strict();
 
-export const refreshSchema = z.object({
-  refreshToken: z.string().trim().min(20),
-});
+export const refreshSchema = z
+  .object({
+    refreshToken: z.string().trim().min(20),
+  })
+  .strict();
 
-export const logoutSchema = z.object({
-  refreshToken: z.string().trim().min(20).optional(),
-  allDevices: z.boolean().optional().default(false),
-});
+export const logoutSchema = z
+  .object({
+    refreshToken: z.string().trim().min(20).optional(),
+    allDevices: z.boolean().optional().default(false),
+  })
+  .strict();
 
-export const forgotPasswordSchema = z.object({
-  phone: phoneSchema,
-});
+export const forgotPasswordSchema = z
+  .object({
+    phone: phoneSchema,
+  })
+  .strict();
 
-export const resetPasswordSchema = z.object({
-  phone: phoneSchema,
-  code: otpCodeSchema,
-  password: z.string().min(8).max(128),
-});
+export const resetPasswordSchema = z
+  .object({
+    phone: phoneSchema,
+    code: otpCodeSchema,
+    password: z.string().min(8).max(72),
+  })
+  .strict();
 
-export const resendOtpSchema = z.object({
-  phone: phoneSchema,
-  purpose: z.enum(["registration", "new_device", "password_reset"]),
-});
+export const resendOtpSchema = z
+  .object({
+    phone: phoneSchema,
+    purpose: z.enum(["registration", "new_device", "password_reset"]),
+  })
+  .strict();
 
 export type RegisterStartInput = z.infer<typeof registerStartSchema>;
 export type RegisterVerifyInput = z.infer<typeof registerVerifySchema>;

@@ -10,6 +10,8 @@ import {
   handleProcessNotification,
   handleRenewalReminders,
   handleTrialReminders,
+  handleUpcomingWeekDigest,
+  handleWeeklySummary,
 } from "./handlers.js";
 import { registerRepeatableSchedulers } from "./producers.js";
 
@@ -27,6 +29,10 @@ async function processJob(job: Job): Promise<unknown> {
       return handleCurrencyRateUpdate();
     case JobName.ProcessNotification:
       return handleProcessNotification(job.data as NotificationJobData);
+    case JobName.WeeklySummary:
+      return handleWeeklySummary();
+    case JobName.UpcomingWeekDigest:
+      return handleUpcomingWeekDigest();
     case JobName.MonthlyCalculations:
       return handleMonthlyCalculations();
     case JobName.ExpiredSessionCleanup:
