@@ -12,6 +12,10 @@ export function generateOpaqueToken(bytes = 48): string {
   return randomBytes(bytes).toString("base64url");
 }
 
+export function generateOtpCode(): string {
+  return String(randomBytes(3).readUIntBE(0, 3) % 1_000_000).padStart(6, "0");
+}
+
 export function signAccessToken(payload: Omit<AccessTokenPayload, "typ">): string {
   const options: SignOptions = {
     expiresIn: config.auth.accessTokenTtlSeconds,
@@ -33,14 +37,14 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
       decoded === null ||
       decoded.typ !== "access" ||
       typeof decoded.sub !== "string" ||
-      typeof decoded.email !== "string"
+      typeof decoded.phone !== "string"
     ) {
       throw new AppError(401, "Invalid access token");
     }
 
     return {
       sub: decoded.sub,
-      email: decoded.email,
+      phone: decoded.phone,
       typ: "access",
     };
   } catch (error) {

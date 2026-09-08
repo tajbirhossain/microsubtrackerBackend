@@ -2,6 +2,7 @@ import type {
   AuditActorType,
   BillingCycle,
   DevicePlatform,
+  OtpPurpose,
   ParserEventStatus,
   ParserSourceType,
   SpendScale,
@@ -11,7 +12,8 @@ import type {
 
 export interface UserRow {
   id: string;
-  email: string;
+  phone: string;
+  email: string | null;
   password_hash: string;
   display_name: string | null;
   preferred_currency: string;
@@ -157,5 +159,20 @@ export interface PasswordResetTokenRow {
   token_hash: string;
   expires_at: Date;
   used_at: Date | null;
+  created_at: Date;
+}
+
+export interface OtpChallengeRow {
+  id: string;
+  phone: string;
+  purpose: OtpPurpose;
+  code_hash: string;
+  user_id: string | null;
+  device_key: string | null;
+  payload: Record<string, unknown>;
+  attempt_count: number;
+  max_attempts: number;
+  expires_at: Date;
+  consumed_at: Date | null;
   created_at: Date;
 }

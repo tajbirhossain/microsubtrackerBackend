@@ -5,27 +5,46 @@ import { validateRequest } from "../middleware/validate.js";
 import {
   forgotPasswordSchema,
   loginSchema,
+  loginVerifyDeviceSchema,
   logoutSchema,
   refreshSchema,
-  registerSchema,
-  resendVerificationSchema,
+  registerStartSchema,
+  registerVerifySchema,
+  resendOtpSchema,
   resetPasswordSchema,
-  verifyEmailSchema,
 } from "../schemas/auth.schemas.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
 
 router.post(
-  "/register",
-  validateRequest(registerSchema),
-  asyncHandler(authController.register)
+  "/register/start",
+  validateRequest(registerStartSchema),
+  asyncHandler(authController.startRegistration)
+);
+
+router.post(
+  "/register/verify",
+  validateRequest(registerVerifySchema),
+  asyncHandler(authController.verifyRegistration)
 );
 
 router.post(
   "/login",
   validateRequest(loginSchema),
   asyncHandler(authController.login)
+);
+
+router.post(
+  "/login/verify-device",
+  validateRequest(loginVerifyDeviceSchema),
+  asyncHandler(authController.verifyNewDeviceLogin)
+);
+
+router.post(
+  "/otp/resend",
+  validateRequest(resendOtpSchema),
+  asyncHandler(authController.resendOtp)
 );
 
 router.post(
@@ -42,18 +61,6 @@ router.post(
 );
 
 router.get("/me", asyncHandler(requireAuth), asyncHandler(authController.me));
-
-router.post(
-  "/verify-email",
-  validateRequest(verifyEmailSchema),
-  asyncHandler(authController.verifyEmail)
-);
-
-router.post(
-  "/resend-verification",
-  validateRequest(resendVerificationSchema),
-  asyncHandler(authController.resendVerification)
-);
 
 router.post(
   "/forgot-password",

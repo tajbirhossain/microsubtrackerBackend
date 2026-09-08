@@ -52,14 +52,8 @@ export function loadConfig(): AppConfig {
         "REFRESH_TOKEN_TTL_SECONDS",
         60 * 60 * 24 * 30
       ),
-      emailVerificationTtlSeconds: optionalPositiveInt(
-        "EMAIL_VERIFICATION_TTL_SECONDS",
-        60 * 60 * 24
-      ),
-      passwordResetTtlSeconds: optionalPositiveInt(
-        "PASSWORD_RESET_TTL_SECONDS",
-        60 * 60
-      ),
+      otpTtlSeconds: optionalPositiveInt("OTP_TTL_SECONDS", 600),
+      otpMaxAttempts: optionalPositiveInt("OTP_MAX_ATTEMPTS", 5),
       bcryptCost: optionalPositiveInt("BCRYPT_COST", isDev ? 10 : 12),
       appPublicUrl: optionalEnv("APP_PUBLIC_URL", "http://localhost:5000"),
     },

@@ -1,8 +1,23 @@
 import type { Request, Response } from "express";
 import * as authService from "../services/auth.service.js";
 
-export async function register(req: Request, res: Response): Promise<void> {
-  const result = await authService.register(req.body);
+export async function startRegistration(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const result = await authService.startRegistration(req.body);
+  res.status(202).json({
+    success: true,
+    message: "OTP sent for registration",
+    data: result,
+  });
+}
+
+export async function verifyRegistration(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const result = await authService.verifyRegistration(req.body);
   res.status(201).json({
     success: true,
     message: "Account created",
@@ -12,9 +27,25 @@ export async function register(req: Request, res: Response): Promise<void> {
 
 export async function login(req: Request, res: Response): Promise<void> {
   const result = await authService.login(req.body);
+  const requiresOtp = "requiresOtp" in result && result.requiresOtp;
+
+  res.status(requiresOtp ? 202 : 200).json({
+    success: true,
+    message: requiresOtp
+      ? "OTP required for new device"
+      : "Logged in",
+    data: result,
+  });
+}
+
+export async function verifyNewDeviceLogin(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const result = await authService.verifyNewDeviceLogin(req.body);
   res.json({
     success: true,
-    message: "Logged in",
+    message: "Logged in on new device",
     data: result,
   });
 }
@@ -45,41 +76,29 @@ export async function me(req: Request, res: Response): Promise<void> {
   });
 }
 
-export async function verifyEmail(req: Request, res: Response): Promise<void> {
-  const user = await authService.verifyEmail(req.body.token);
-  res.json({
-    success: true,
-    message: "Email verified",
-    data: { user },
-  });
-}
-
-export async function resendVerification(
-  req: Request,
-  res: Response
-): Promise<void> {
-  const result = await authService.resendVerification(req.body.email);
-  res.json({
-    success: true,
-    message: "If that email exists, a verification link was sent",
-    data: result,
-  });
-}
-
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
-  const result = await authService.forgotPassword(req.body.email);
-  res.json({
+  const result = await authService.forgotPassword(req.body);
+  res.status(202).json({
     success: true,
-    message: "If that email exists, a reset link was sent",
+    message: "If that phone number exists, an OTP was sent",
     data: result,
   });
 }
 
 export async function resetPassword(req: Request, res: Response): Promise<void> {
-  const result = await authService.resetPassword(req.body.token, req.body.password);
+  const result = await authService.resetPassword(req.body);
   res.json({
     success: true,
     message: "Password updated",
+    data: result,
+  });
+}
+
+export async function resendOtp(req: Request, res: Response): Promise<void> {
+  const result = await authService.resendOtp(req.body);
+  res.status(202).json({
+    success: true,
+    message: "OTP resent",
     data: result,
   });
 }

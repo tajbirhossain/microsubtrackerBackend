@@ -2,13 +2,16 @@ import type { PoolClient } from "pg";
 import config from "../config/index.js";
 import { withTransaction } from "../db/transaction.js";
 import {
-  consumeEmailVerificationToken,
-  consumePasswordResetToken,
-  createEmailVerificationToken,
-  createPasswordResetToken,
-} from "../repositories/auth-token.repository.js";
-import { upsertDevice } from "../repositories/device.repository.js";
+  findDeviceByUserAndKey,
+  upsertDevice,
+} from "../repositories/device.repository.js";
 import { createDefaultNotificationPreferences } from "../repositories/notification-preferences.repository.js";
+import {
+  consumeOtpChallenge,
+  createOtpChallenge,
+  findActiveOtpChallenge,
+  incrementOtpAttempts,
+} from "../repositories/otp.repository.js";
 import {
   createRefreshToken,
   findActiveRefreshTokenByHash,
@@ -17,25 +20,30 @@ import {
 } from "../repositories/refresh-token.repository.js";
 import {
   createUser,
-  findActiveUserByEmail,
   findActiveUserById,
-  markEmailVerified,
+  findActiveUserByPhone,
   softDeleteUser,
   updatePasswordHash,
 } from "../repositories/user.repository.js";
 import type {
   DeviceInput,
+  ForgotPasswordInput,
   LoginInput,
+  LoginVerifyDeviceInput,
   LogoutInput,
   RefreshInput,
-  RegisterInput,
+  RegisterStartInput,
+  RegisterVerifyInput,
+  ResendOtpInput,
+  ResetPasswordInput,
 } from "../schemas/auth.schemas.js";
-import type { AuthTokens, AuthUser } from "../types/index.js";
+import type { AuthTokens, AuthUser, OtpPurpose } from "../types/index.js";
 import { AppError } from "../utils/errors.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
 import {
   addSeconds,
   generateOpaqueToken,
+  generateOtpCode,
   hashToken,
   signAccessToken,
 } from "../utils/tokens.js";
@@ -47,9 +55,18 @@ type AuthSessionResult = {
   deviceId: string;
 };
 
-type DevTokenPayload = {
-  token: string;
+type OtpSentResult = {
+  requiresOtp: true;
+  purpose: OtpPurpose;
   expiresAt: string;
+  otp?: string;
+};
+
+type RegistrationPayload = {
+  passwordHash: string;
+  displayName?: string;
+  preferredCurrency?: string;
+  device: DeviceInput;
 };
 
 function buildTokens(accessToken: string, refreshToken: string): AuthTokens {
@@ -61,10 +78,40 @@ function buildTokens(accessToken: string, refreshToken: string): AuthTokens {
   };
 }
 
+function asRegistrationPayload(payload: Record<string, unknown>): RegistrationPayload {
+  const passwordHash = payload.passwordHash;
+  const device = payload.device;
+
+  if (typeof passwordHash !== "string" || !device || typeof device !== "object") {
+    throw new AppError(400, "Registration challenge is invalid");
+  }
+
+  const typedDevice = device as DeviceInput;
+  if (
+    typeof typedDevice.deviceKey !== "string" ||
+    (typedDevice.platform !== "android" &&
+      typedDevice.platform !== "ios" &&
+      typedDevice.platform !== "web")
+  ) {
+    throw new AppError(400, "Registration challenge device is invalid");
+  }
+
+  return {
+    passwordHash,
+    displayName:
+      typeof payload.displayName === "string" ? payload.displayName : undefined,
+    preferredCurrency:
+      typeof payload.preferredCurrency === "string"
+        ? payload.preferredCurrency
+        : undefined,
+    device: typedDevice,
+  };
+}
+
 async function issueSession(
   input: {
     userId: string;
-    email: string;
+    phone: string;
     device: DeviceInput;
   },
   client?: PoolClient
@@ -96,63 +143,137 @@ async function issueSession(
   return {
     deviceId: device.id,
     tokens: buildTokens(
-      signAccessToken({ sub: input.userId, email: input.email }),
+      signAccessToken({ sub: input.userId, phone: input.phone }),
       refreshToken
     ),
   };
 }
 
-function logDevToken(
-  kind: "email-verification" | "password-reset",
-  token: string
-): void {
-  if (!config.isDev) {
-    return;
+async function issueOtpChallenge(input: {
+  phone: string;
+  purpose: OtpPurpose;
+  userId?: string | null;
+  deviceKey?: string | null;
+  payload?: Record<string, unknown>;
+}): Promise<OtpSentResult> {
+  const code = generateOtpCode();
+  const expiresAt = addSeconds(new Date(), config.auth.otpTtlSeconds);
+
+  await createOtpChallenge({
+    phone: input.phone,
+    purpose: input.purpose,
+    codeHash: hashToken(code),
+    userId: input.userId,
+    deviceKey: input.deviceKey,
+    payload: input.payload,
+    expiresAt,
+    maxAttempts: config.auth.otpMaxAttempts,
+  });
+
+  if (config.isDev) {
+    console.info(`[auth:otp:${input.purpose}] ${input.phone} => ${code}`);
   }
-  console.info(`[auth:${kind}] ${token}`);
+
+  return {
+    requiresOtp: true,
+    purpose: input.purpose,
+    expiresAt: expiresAt.toISOString(),
+    ...(config.isDev ? { otp: code } : {}),
+  };
 }
 
-export async function register(input: RegisterInput): Promise<
-  AuthSessionResult & { verification?: DevTokenPayload }
-> {
-  const existing = await findActiveUserByEmail(input.email);
+async function verifyOtpCode(input: {
+  phone: string;
+  purpose: OtpPurpose;
+  code: string;
+  client?: PoolClient;
+}) {
+  const challenge = await findActiveOtpChallenge(
+    input.phone,
+    input.purpose,
+    input.client
+  );
+
+  if (!challenge) {
+    throw new AppError(400, "No active OTP challenge found");
+  }
+
+  if (challenge.attempt_count >= challenge.max_attempts) {
+    throw new AppError(429, "Too many invalid OTP attempts");
+  }
+
+  const matches = hashToken(input.code) === challenge.code_hash;
+  if (!matches) {
+    await incrementOtpAttempts(challenge.id, input.client);
+    throw new AppError(400, "Invalid OTP code");
+  }
+
+  const consumed = await consumeOtpChallenge(challenge.id, input.client);
+  if (!consumed) {
+    throw new AppError(400, "OTP challenge expired");
+  }
+
+  return consumed;
+}
+
+export async function startRegistration(
+  input: RegisterStartInput
+): Promise<OtpSentResult> {
+  const existing = await findActiveUserByPhone(input.phone);
   if (existing) {
-    throw new AppError(409, "Email is already registered");
+    throw new AppError(409, "Phone number is already registered");
   }
 
   const passwordHash = await hashPassword(input.password);
-  const verificationToken = generateOpaqueToken();
-  const verificationExpiresAt = addSeconds(
-    new Date(),
-    config.auth.emailVerificationTtlSeconds
-  );
 
-  const result = await withTransaction(async (client) => {
+  return issueOtpChallenge({
+    phone: input.phone,
+    purpose: "registration",
+    payload: {
+      passwordHash,
+      displayName: input.displayName,
+      preferredCurrency: input.preferredCurrency,
+      device: input.device,
+    },
+  });
+}
+
+export async function verifyRegistration(
+  input: RegisterVerifyInput
+): Promise<AuthSessionResult> {
+  return withTransaction(async (client) => {
+    const challenge = await verifyOtpCode({
+      phone: input.phone,
+      purpose: "registration",
+      code: input.code,
+      client,
+    });
+
+    const existing = await findActiveUserByPhone(input.phone, client);
+    if (existing) {
+      throw new AppError(409, "Phone number is already registered");
+    }
+
+    const pending = asRegistrationPayload(challenge.payload);
+    const device = input.device;
+
     const created = await createUser(
       {
-        email: input.email,
-        passwordHash,
-        displayName: input.displayName,
-        preferredCurrency: input.preferredCurrency,
+        phone: input.phone,
+        passwordHash: pending.passwordHash,
+        displayName: pending.displayName,
+        preferredCurrency: pending.preferredCurrency,
       },
       client
     );
 
     await createDefaultNotificationPreferences(created.id, client);
-    await createEmailVerificationToken(
-      {
-        userId: created.id,
-        tokenHash: hashToken(verificationToken),
-        expiresAt: verificationExpiresAt,
-      },
-      client
-    );
 
     const session = await issueSession(
       {
         userId: created.id,
-        email: created.email,
-        device: input.device,
+        phone: created.phone,
+        device,
       },
       client
     );
@@ -163,44 +284,93 @@ export async function register(input: RegisterInput): Promise<
       deviceId: session.deviceId,
     };
   });
-
-  logDevToken("email-verification", verificationToken);
-
-  return {
-    ...result,
-    ...(config.isDev
-      ? {
-          verification: {
-            token: verificationToken,
-            expiresAt: verificationExpiresAt.toISOString(),
-          },
-        }
-      : {}),
-  };
 }
 
-export async function login(input: LoginInput): Promise<AuthSessionResult> {
-  const user = await findActiveUserByEmail(input.email);
+export async function login(
+  input: LoginInput
+): Promise<AuthSessionResult | OtpSentResult> {
+  const user = await findActiveUserByPhone(input.phone);
   if (!user) {
-    throw new AppError(401, "Invalid email or password");
+    throw new AppError(401, "Invalid phone number or password");
   }
 
   const passwordOk = await verifyPassword(input.password, user.password_hash);
   if (!passwordOk) {
-    throw new AppError(401, "Invalid email or password");
+    throw new AppError(401, "Invalid phone number or password");
   }
 
-  const session = await issueSession({
-    userId: user.id,
-    email: user.email,
-    device: input.device,
-  });
+  const knownDevice = await findDeviceByUserAndKey(
+    user.id,
+    input.device.deviceKey
+  );
 
-  return {
-    user: toAuthUser(user),
-    tokens: session.tokens,
-    deviceId: session.deviceId,
-  };
+  if (knownDevice) {
+    const session = await issueSession({
+      userId: user.id,
+      phone: user.phone,
+      device: input.device,
+    });
+
+    return {
+      user: toAuthUser(user),
+      tokens: session.tokens,
+      deviceId: session.deviceId,
+    };
+  }
+
+  return issueOtpChallenge({
+    phone: user.phone,
+    purpose: "new_device",
+    userId: user.id,
+    deviceKey: input.device.deviceKey,
+    payload: {
+      device: input.device,
+    },
+  });
+}
+
+export async function verifyNewDeviceLogin(
+  input: LoginVerifyDeviceInput
+): Promise<AuthSessionResult> {
+  return withTransaction(async (client) => {
+    const challenge = await verifyOtpCode({
+      phone: input.phone,
+      purpose: "new_device",
+      code: input.code,
+      client,
+    });
+
+    if (!challenge.user_id) {
+      throw new AppError(400, "Invalid new-device challenge");
+    }
+
+    if (
+      challenge.device_key &&
+      challenge.device_key !== input.device.deviceKey
+    ) {
+      throw new AppError(400, "OTP was issued for a different device");
+    }
+
+    const user = await findActiveUserById(challenge.user_id, client);
+    if (!user) {
+      throw new AppError(401, "User not found or inactive");
+    }
+
+    const session = await issueSession(
+      {
+        userId: user.id,
+        phone: user.phone,
+        device: input.device,
+      },
+      client
+    );
+
+    return {
+      user: toAuthUser(user),
+      tokens: session.tokens,
+      deviceId: session.deviceId,
+    };
+  });
 }
 
 export async function refresh(input: RefreshInput): Promise<AuthSessionResult> {
@@ -238,7 +408,7 @@ export async function refresh(input: RefreshInput): Promise<AuthSessionResult> {
       user: toAuthUser(user),
       deviceId: stored.device_id,
       tokens: buildTokens(
-        signAccessToken({ sub: user.id, email: user.email }),
+        signAccessToken({ sub: user.id, phone: user.phone }),
         nextRefreshToken
       ),
     };
@@ -274,105 +444,57 @@ export async function logout(
   return { revoked: true };
 }
 
-export async function verifyEmail(token: string): Promise<AuthUser> {
-  const consumed = await consumeEmailVerificationToken(hashToken(token));
-  if (!consumed) {
-    throw new AppError(400, "Invalid or expired verification token");
-  }
-
-  const user = await markEmailVerified(consumed.user_id);
-  if (!user) {
-    throw new AppError(404, "User not found");
-  }
-
-  return toAuthUser(user);
-}
-
-export async function resendVerification(email: string): Promise<{
-  sent: boolean;
-  verification?: DevTokenPayload;
-}> {
-  const user = await findActiveUserByEmail(email);
-  if (!user || user.email_verified_at) {
-    return { sent: true };
-  }
-
-  const token = generateOpaqueToken();
-  const expiresAt = addSeconds(
-    new Date(),
-    config.auth.emailVerificationTtlSeconds
-  );
-
-  await createEmailVerificationToken({
-    userId: user.id,
-    tokenHash: hashToken(token),
-    expiresAt,
-  });
-
-  logDevToken("email-verification", token);
-
-  return {
-    sent: true,
-    ...(config.isDev
-      ? {
-          verification: {
-            token,
-            expiresAt: expiresAt.toISOString(),
-          },
-        }
-      : {}),
-  };
-}
-
-export async function forgotPassword(email: string): Promise<{
-  sent: boolean;
-  reset?: DevTokenPayload;
-}> {
-  const user = await findActiveUserByEmail(email);
+export async function forgotPassword(
+  input: ForgotPasswordInput
+): Promise<OtpSentResult | { sent: true }> {
+  const user = await findActiveUserByPhone(input.phone);
   if (!user) {
     return { sent: true };
   }
 
-  const token = generateOpaqueToken();
-  const expiresAt = addSeconds(new Date(), config.auth.passwordResetTtlSeconds);
-
-  await createPasswordResetToken({
+  return issueOtpChallenge({
+    phone: user.phone,
+    purpose: "password_reset",
     userId: user.id,
-    tokenHash: hashToken(token),
-    expiresAt,
   });
-
-  logDevToken("password-reset", token);
-
-  return {
-    sent: true,
-    ...(config.isDev
-      ? {
-          reset: {
-            token,
-            expiresAt: expiresAt.toISOString(),
-          },
-        }
-      : {}),
-  };
 }
 
 export async function resetPassword(
-  token: string,
-  password: string
+  input: ResetPasswordInput
 ): Promise<{ reset: true }> {
   await withTransaction(async (client) => {
-    const consumed = await consumePasswordResetToken(hashToken(token), client);
-    if (!consumed) {
-      throw new AppError(400, "Invalid or expired reset token");
+    const challenge = await verifyOtpCode({
+      phone: input.phone,
+      purpose: "password_reset",
+      code: input.code,
+      client,
+    });
+
+    if (!challenge.user_id) {
+      throw new AppError(400, "Invalid password-reset challenge");
     }
 
-    const passwordHash = await hashPassword(password);
-    await updatePasswordHash(consumed.user_id, passwordHash, client);
-    await revokeRefreshTokensForUser(consumed.user_id, client);
+    const passwordHash = await hashPassword(input.password);
+    await updatePasswordHash(challenge.user_id, passwordHash, client);
+    await revokeRefreshTokensForUser(challenge.user_id, client);
   });
 
   return { reset: true };
+}
+
+export async function resendOtp(input: ResendOtpInput): Promise<OtpSentResult> {
+  const active = await findActiveOtpChallenge(input.phone, input.purpose);
+  if (!active) {
+    throw new AppError(400, "No active OTP challenge to resend");
+  }
+
+  return issueOtpChallenge({
+    phone: active.phone,
+    purpose: active.purpose,
+    userId: active.user_id,
+    deviceKey: active.device_key,
+    payload: active.payload,
+  });
 }
 
 export async function deleteAccount(userId: string): Promise<{ deleted: true }> {

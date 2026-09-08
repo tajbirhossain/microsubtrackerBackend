@@ -10,8 +10,8 @@ export interface AuthConfig {
   refreshTokenSecret: string;
   accessTokenTtlSeconds: number;
   refreshTokenTtlSeconds: number;
-  emailVerificationTtlSeconds: number;
-  passwordResetTtlSeconds: number;
+  otpTtlSeconds: number;
+  otpMaxAttempts: number;
   bcryptCost: number;
   appPublicUrl: string;
 }
@@ -89,10 +89,9 @@ export interface PaginatedResult<T> {
 
 export interface AuthUser {
   id: string;
-  email: string;
+  phone: string;
   displayName: string | null;
   preferredCurrency: string;
-  emailVerified: boolean;
   createdAt: string;
 }
 
@@ -106,8 +105,10 @@ export interface AuthTokens {
 export interface AccessTokenPayload {
   sub: string;
   typ: "access";
-  email: string;
+  phone: string;
 }
+
+export type OtpPurpose = "registration" | "new_device" | "password_reset";
 
 export type {
   UserRow,
@@ -122,4 +123,5 @@ export type {
   AuditLogRow,
   EmailVerificationTokenRow,
   PasswordResetTokenRow,
+  OtpChallengeRow,
 } from "./database.js";

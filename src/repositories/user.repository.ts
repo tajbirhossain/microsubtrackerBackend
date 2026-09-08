@@ -3,25 +3,25 @@ import { query, queryOne } from "../db/query.js";
 import type { UserRow } from "../types/database.js";
 
 export type CreateUserInput = {
-  email: string;
+  phone: string;
   passwordHash: string;
   displayName?: string;
   preferredCurrency?: string;
 };
 
-export async function findActiveUserByEmail(
-  email: string,
+export async function findActiveUserByPhone(
+  phone: string,
   client?: Queryable
 ): Promise<UserRow | null> {
   return queryOne<UserRow>(
     `
       SELECT *
       FROM users
-      WHERE LOWER(email) = LOWER($1)
+      WHERE phone = $1
         AND deleted_at IS NULL
       LIMIT 1
     `,
-    [email],
+    [phone],
     client
   );
 }
@@ -49,12 +49,12 @@ export async function createUser(
 ): Promise<UserRow> {
   const user = await queryOne<UserRow>(
     `
-      INSERT INTO users (email, password_hash, display_name, preferred_currency)
+      INSERT INTO users (phone, password_hash, display_name, preferred_currency)
       VALUES ($1, $2, $3, COALESCE($4, 'USD'))
       RETURNING *
     `,
     [
-      input.email.toLowerCase(),
+      input.phone,
       input.passwordHash,
       input.displayName ?? null,
       input.preferredCurrency ?? null,
@@ -67,23 +67,6 @@ export async function createUser(
   }
 
   return user;
-}
-
-export async function markEmailVerified(
-  userId: string,
-  client?: Queryable
-): Promise<UserRow | null> {
-  return queryOne<UserRow>(
-    `
-      UPDATE users
-      SET email_verified_at = COALESCE(email_verified_at, NOW())
-      WHERE id = $1
-        AND deleted_at IS NULL
-      RETURNING *
-    `,
-    [userId],
-    client
-  );
 }
 
 export async function updatePasswordHash(

@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+/** E.164: + followed by 8–15 digits total (country code + subscriber number). */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/[\s()-]/g, ""))
+  .refine((value) => /^\+[1-9]\d{7,14}$/.test(value), {
+    message: "Phone must be E.164 format, e.g. +15551234567",
+  });
+
+export const otpCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "OTP must be a 6-digit code");
+
 export const deviceSchema = z.object({
   deviceKey: z.string().trim().min(1).max(255),
   platform: z.enum(["android", "ios", "web"]),
@@ -7,8 +21,8 @@ export const deviceSchema = z.object({
   appVersion: z.string().trim().min(1).max(64).optional(),
 });
 
-export const registerSchema = z.object({
-  email: z.string().trim().email().max(254),
+export const registerStartSchema = z.object({
+  phone: phoneSchema,
   password: z.string().min(8).max(128),
   displayName: z.string().trim().min(1).max(80).optional(),
   preferredCurrency: z
@@ -20,9 +34,21 @@ export const registerSchema = z.object({
   device: deviceSchema,
 });
 
+export const registerVerifySchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema,
+  device: deviceSchema,
+});
+
 export const loginSchema = z.object({
-  email: z.string().trim().email().max(254),
+  phone: phoneSchema,
   password: z.string().min(1).max(128),
+  device: deviceSchema,
+});
+
+export const loginVerifyDeviceSchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema,
   device: deviceSchema,
 });
 
@@ -35,25 +61,28 @@ export const logoutSchema = z.object({
   allDevices: z.boolean().optional().default(false),
 });
 
-export const verifyEmailSchema = z.object({
-  token: z.string().trim().min(20),
-});
-
-export const resendVerificationSchema = z.object({
-  email: z.string().trim().email().max(254),
-});
-
 export const forgotPasswordSchema = z.object({
-  email: z.string().trim().email().max(254),
+  phone: phoneSchema,
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().trim().min(20),
+  phone: phoneSchema,
+  code: otpCodeSchema,
   password: z.string().min(8).max(128),
 });
 
-export type RegisterInput = z.infer<typeof registerSchema>;
+export const resendOtpSchema = z.object({
+  phone: phoneSchema,
+  purpose: z.enum(["registration", "new_device", "password_reset"]),
+});
+
+export type RegisterStartInput = z.infer<typeof registerStartSchema>;
+export type RegisterVerifyInput = z.infer<typeof registerVerifySchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginVerifyDeviceInput = z.infer<typeof loginVerifyDeviceSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
 export type LogoutInput = z.infer<typeof logoutSchema>;
 export type DeviceInput = z.infer<typeof deviceSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
