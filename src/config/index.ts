@@ -12,6 +12,11 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function optionalEnv(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : fallback;
+}
+
 function optionalPositiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === "") {
@@ -26,16 +31,37 @@ function optionalPositiveInt(name: string, fallback: number): number {
 
 export function loadConfig(): AppConfig {
   const env = process.env.NODE_ENV ?? "development";
+  const isDev = env === "development";
+  const accessTokenSecret = requireEnv("JWT_ACCESS_SECRET");
 
   return {
     env,
     port: optionalPositiveInt("PORT", 5000),
-    isDev: env === "development",
+    isDev,
     database: {
       url: requireEnv("DATABASE_URL"),
       poolMax: optionalPositiveInt("DB_POOL_MAX", 10),
       idleTimeoutMs: optionalPositiveInt("DB_IDLE_TIMEOUT_MS", 30_000),
       connectionTimeoutMs: optionalPositiveInt("DB_CONNECTION_TIMEOUT_MS", 5_000),
+    },
+    auth: {
+      accessTokenSecret,
+      refreshTokenSecret: optionalEnv("JWT_REFRESH_SECRET", accessTokenSecret),
+      accessTokenTtlSeconds: optionalPositiveInt("ACCESS_TOKEN_TTL_SECONDS", 900),
+      refreshTokenTtlSeconds: optionalPositiveInt(
+        "REFRESH_TOKEN_TTL_SECONDS",
+        60 * 60 * 24 * 30
+      ),
+      emailVerificationTtlSeconds: optionalPositiveInt(
+        "EMAIL_VERIFICATION_TTL_SECONDS",
+        60 * 60 * 24
+      ),
+      passwordResetTtlSeconds: optionalPositiveInt(
+        "PASSWORD_RESET_TTL_SECONDS",
+        60 * 60
+      ),
+      bcryptCost: optionalPositiveInt("BCRYPT_COST", isDev ? 10 : 12),
+      appPublicUrl: optionalEnv("APP_PUBLIC_URL", "http://localhost:5000"),
     },
   };
 }

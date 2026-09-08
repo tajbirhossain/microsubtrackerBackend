@@ -5,11 +5,23 @@ export interface DatabaseConfig {
   connectionTimeoutMs: number;
 }
 
+export interface AuthConfig {
+  accessTokenSecret: string;
+  refreshTokenSecret: string;
+  accessTokenTtlSeconds: number;
+  refreshTokenTtlSeconds: number;
+  emailVerificationTtlSeconds: number;
+  passwordResetTtlSeconds: number;
+  bcryptCost: number;
+  appPublicUrl: string;
+}
+
 export interface AppConfig {
   env: string;
   port: number;
   isDev: boolean;
   database: DatabaseConfig;
+  auth: AuthConfig;
 }
 
 export interface ApiSuccessResponse<T = unknown> {
@@ -22,10 +34,12 @@ export interface ApiErrorResponse {
   success: false;
   message: string;
   stack?: string;
+  details?: unknown;
 }
 
 export interface HttpError extends Error {
   statusCode?: number;
+  details?: unknown;
 }
 
 export type BillingCycle = "weekly" | "monthly" | "yearly";
@@ -73,6 +87,28 @@ export interface PaginatedResult<T> {
   hasMore: boolean;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+  preferredCurrency: string;
+  emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresIn: number;
+  tokenType: "Bearer";
+}
+
+export interface AccessTokenPayload {
+  sub: string;
+  typ: "access";
+  email: string;
+}
+
 export type {
   UserRow,
   CategoryRow,
@@ -84,4 +120,6 @@ export type {
   CurrencyRateRow,
   ParserEventRow,
   AuditLogRow,
+  EmailVerificationTokenRow,
+  PasswordResetTokenRow,
 } from "./database.js";

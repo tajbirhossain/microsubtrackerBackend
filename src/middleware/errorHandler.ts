@@ -11,13 +11,14 @@ export function errorHandler(
   const statusCode = err.statusCode ?? 500;
   const message = err.message ?? "Internal Server Error";
 
-  if (config.isDev) {
+  if (config.isDev && statusCode >= 500) {
     console.error(err);
   }
 
   res.status(statusCode).json({
     success: false,
     message,
+    ...(err.details !== undefined ? { details: err.details } : {}),
     ...(config.isDev && err.stack ? { stack: err.stack } : {}),
   });
 }
