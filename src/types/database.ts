@@ -1,4 +1,6 @@
 import type {
+  AnalyticsAction,
+  AnalyticsFunnel,
   AuditActorType,
   BillingCycle,
   DevicePlatform,
@@ -192,5 +194,18 @@ export interface OtpChallengeRow {
   max_attempts: number;
   expires_at: Date;
   consumed_at: Date | null;
+  created_at: Date;
+}
+
+export interface AnalyticsEventRow {
+  id: string;
+  session_id: string;
+  user_id: string | null;
+  anonymous_id: string | null;
+  device_key: string | null;
+  funnel: AnalyticsFunnel;
+  step: string;
+  action: AnalyticsAction;
+  properties: Record<string, unknown>;
   created_at: Date;
 }

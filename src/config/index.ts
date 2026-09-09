@@ -195,6 +195,7 @@ export function loadConfig(): AppConfig {
         optionalEnv("TRUST_PROXY", isDev ? "false" : "true").toLowerCase() ===
         "true",
       userRateLimitMax: optionalPositiveInt("USER_RATE_LIMIT_MAX", 180),
+      analyticsAdminToken: optionalEnv("ANALYTICS_ADMIN_TOKEN", "") || null,
     },
   };
 }

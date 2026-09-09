@@ -46,6 +46,7 @@ export interface SecurityConfig {
   corsOrigins: string[];
   trustProxy: boolean;
   userRateLimitMax: number;
+  analyticsAdminToken: string | null;
 }
 
 export interface AppConfig {
@@ -114,6 +115,38 @@ export type SubscriptionEventType =
   | "usage_recorded"
   | "category_changed";
 
+export type AnalyticsFunnel = "onboarding" | "paywall";
+
+export type AnalyticsAction =
+  | "viewed"
+  | "completed"
+  | "skipped"
+  | "purchase_started"
+  | "purchase_completed"
+  | "dismissed";
+
+/** Ordered signup path — used for drop-off aggregation. */
+export const ONBOARDING_FUNNEL_STEPS = [
+  "welcome",
+  "auth",
+  "verify_code",
+  "notifications",
+  "country",
+  "name",
+  "interests",
+  "profile",
+  "plan",
+  "completed",
+] as const;
+
+export type OnboardingFunnelStep = (typeof ONBOARDING_FUNNEL_STEPS)[number];
+
+/** Client may send phone/login; both normalize to auth. */
+export const ONBOARDING_STEP_ALIASES: Record<string, OnboardingFunnelStep> = {
+  phone: "auth",
+  login: "auth",
+};
+
 export interface PaginationQuery {
   page?: string | number;
   limit?: string | number;
@@ -172,4 +205,5 @@ export type {
   EmailVerificationTokenRow,
   PasswordResetTokenRow,
   OtpChallengeRow,
+  AnalyticsEventRow,
 } from "./database.js";
