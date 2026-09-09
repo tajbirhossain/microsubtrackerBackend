@@ -1,10 +1,7 @@
-import { Redis } from "ioredis";
-import config from "../config/index.js";
+import type { Redis } from "ioredis";
+import { createRedisClient } from "../redis/options.js";
 
 /** Dedicated BullMQ connection (maxRetriesPerRequest must be null). */
 export function createQueueConnection(): Redis {
-  return new Redis(config.redis.url, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: true,
-  });
+  return createRedisClient();
 }

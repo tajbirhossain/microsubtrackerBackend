@@ -3,25 +3,26 @@ import { query, queryOne } from "../db/query.js";
 import type { UserRow } from "../types/database.js";
 
 export type CreateUserInput = {
-  phone: string;
+  email: string;
   passwordHash: string;
   displayName?: string;
   preferredCurrency?: string;
+  emailVerified?: boolean;
 };
 
-export async function findActiveUserByPhone(
-  phone: string,
+export async function findActiveUserByEmail(
+  email: string,
   client?: Queryable
 ): Promise<UserRow | null> {
   return queryOne<UserRow>(
     `
       SELECT *
       FROM users
-      WHERE phone = $1
+      WHERE LOWER(email) = LOWER($1)
         AND deleted_at IS NULL
       LIMIT 1
     `,
-    [phone],
+    [email],
     client
   );
 }
@@ -49,15 +50,28 @@ export async function createUser(
 ): Promise<UserRow> {
   const user = await queryOne<UserRow>(
     `
-      INSERT INTO users (phone, password_hash, display_name, preferred_currency)
-      VALUES ($1, $2, $3, COALESCE($4, 'USD'))
+      INSERT INTO users (
+        email,
+        password_hash,
+        display_name,
+        preferred_currency,
+        email_verified_at
+      )
+      VALUES (
+        LOWER($1),
+        $2,
+        $3,
+        COALESCE($4, 'USD'),
+        CASE WHEN $5 THEN NOW() ELSE NULL END
+      )
       RETURNING *
     `,
     [
-      input.phone,
+      input.email,
       input.passwordHash,
       input.displayName ?? null,
       input.preferredCurrency ?? null,
+      input.emailVerified ?? true,
     ],
     client
   );

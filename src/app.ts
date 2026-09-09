@@ -58,6 +58,7 @@ app.use(
       "Authorization",
       "Idempotency-Key",
       "X-Request-Id",
+      "X-Analytics-Admin-Token",
     ],
     exposedHeaders: [
       "X-RateLimit-Limit",

@@ -154,6 +154,31 @@ export function loadConfig(): AppConfig {
       bcryptCost: optionalPositiveInt("BCRYPT_COST", isDev ? 10 : 12),
       appPublicUrl: optionalEnv("APP_PUBLIC_URL", "http://localhost:5000"),
     },
+    email: (() => {
+      const hasResendKey = Boolean(optionalEnv("RESEND_API_KEY", ""));
+      const providerRaw = optionalEnv(
+        "EMAIL_PROVIDER",
+        hasResendKey ? "resend" : "log"
+      ).toLowerCase();
+      const provider =
+        providerRaw === "resend" || providerRaw === "log"
+          ? providerRaw
+          : (() => {
+              throw new Error("EMAIL_PROVIDER must be log or resend");
+            })();
+      const resendApiKey = optionalEnv("RESEND_API_KEY", "") || null;
+      if (provider === "resend" && !resendApiKey) {
+        throw new Error("RESEND_API_KEY is required when EMAIL_PROVIDER=resend");
+      }
+      return {
+        provider,
+        from: optionalEnv(
+          "EMAIL_FROM",
+          "Micro Sub Tracker <onboarding@resend.dev>"
+        ),
+        resendApiKey,
+      };
+    })(),
     redis: {
       url: requireEnv("REDIS_URL"),
       keyPrefix: optionalEnv("REDIS_KEY_PREFIX", "mst:"),

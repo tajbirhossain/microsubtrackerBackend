@@ -4,6 +4,7 @@ import type {
   SpendScale,
   SubscriptionStatus,
 } from "../types/index.js";
+import { toDateKey } from "../utils/dates.js";
 
 export type SubscriptionCategoryView = {
   id: string;
@@ -59,9 +60,9 @@ export function toSubscriptionView(
         : null,
     scale: row.scale,
     status: row.status,
-    nextBillingDate: row.next_billing_date,
+    nextBillingDate: toDateKey(row.next_billing_date),
     isTrial: row.is_trial,
-    trialEndsAt: row.trial_ends_at,
+    trialEndsAt: toDateKey(row.trial_ends_at),
     lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : null,
     unusedDays: row.unused_days,
     providerKey: row.provider_key,

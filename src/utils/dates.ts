@@ -24,3 +24,20 @@ export function liveUnusedDays(
 ): number {
   return Math.max(0, calendarDaysBetween(lastUsedAt ?? createdAt, new Date()));
 }
+
+/** Normalize pg DATE / Date / ISO string to YYYY-MM-DD for the mobile client. */
+export function toDateKey(value: Date | string | null | undefined): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
+    if (match?.[1]) return match[1];
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString().slice(0, 10);
+  }
+  if (Number.isNaN(value.getTime())) return null;
+  const y = value.getUTCFullYear();
+  const m = `${value.getUTCMonth() + 1}`.padStart(2, "0");
+  const d = `${value.getUTCDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

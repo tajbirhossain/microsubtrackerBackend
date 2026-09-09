@@ -4,7 +4,7 @@ import type { OtpChallengeRow } from "../types/database.js";
 import type { OtpPurpose } from "../types/index.js";
 
 export type CreateOtpChallengeInput = {
-  phone: string;
+  email: string;
   purpose: OtpPurpose;
   codeHash: string;
   userId?: string | null;
@@ -15,7 +15,7 @@ export type CreateOtpChallengeInput = {
 };
 
 export async function invalidateActiveOtpChallenges(
-  phone: string,
+  email: string,
   purpose: OtpPurpose,
   client?: Queryable
 ): Promise<void> {
@@ -23,11 +23,11 @@ export async function invalidateActiveOtpChallenges(
     `
       UPDATE otp_challenges
       SET consumed_at = NOW()
-      WHERE phone = $1
+      WHERE LOWER(email) = LOWER($1)
         AND purpose = $2
         AND consumed_at IS NULL
     `,
-    [phone, purpose],
+    [email, purpose],
     client
   );
 }
@@ -36,12 +36,12 @@ export async function createOtpChallenge(
   input: CreateOtpChallengeInput,
   client?: Queryable
 ): Promise<OtpChallengeRow> {
-  await invalidateActiveOtpChallenges(input.phone, input.purpose, client);
+  await invalidateActiveOtpChallenges(input.email, input.purpose, client);
 
   const row = await queryOne<OtpChallengeRow>(
     `
       INSERT INTO otp_challenges (
-        phone,
+        email,
         purpose,
         code_hash,
         user_id,
@@ -50,11 +50,11 @@ export async function createOtpChallenge(
         expires_at,
         max_attempts
       )
-      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+      VALUES (LOWER($1), $2, $3, $4, $5, $6::jsonb, $7, $8)
       RETURNING *
     `,
     [
-      input.phone,
+      input.email,
       input.purpose,
       input.codeHash,
       input.userId ?? null,
@@ -74,7 +74,7 @@ export async function createOtpChallenge(
 }
 
 export async function findActiveOtpChallenge(
-  phone: string,
+  email: string,
   purpose: OtpPurpose,
   client?: Queryable
 ): Promise<OtpChallengeRow | null> {
@@ -82,14 +82,14 @@ export async function findActiveOtpChallenge(
     `
       SELECT *
       FROM otp_challenges
-      WHERE phone = $1
+      WHERE LOWER(email) = LOWER($1)
         AND purpose = $2
         AND consumed_at IS NULL
         AND expires_at > NOW()
       ORDER BY created_at DESC
       LIMIT 1
     `,
-    [phone, purpose],
+    [email, purpose],
     client
   );
 }

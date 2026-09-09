@@ -20,6 +20,12 @@ export interface AuthConfig {
   appPublicUrl: string;
 }
 
+export interface EmailConfig {
+  provider: "log" | "resend";
+  from: string;
+  resendApiKey: string | null;
+}
+
 export interface RedisConfig {
   url: string;
   keyPrefix: string;
@@ -55,6 +61,7 @@ export interface AppConfig {
   isDev: boolean;
   database: DatabaseConfig;
   auth: AuthConfig;
+  email: EmailConfig;
   redis: RedisConfig;
   jobs: JobsConfig;
   push: PushConfig;
@@ -141,9 +148,10 @@ export const ONBOARDING_FUNNEL_STEPS = [
 
 export type OnboardingFunnelStep = (typeof ONBOARDING_FUNNEL_STEPS)[number];
 
-/** Client may send phone/login; both normalize to auth. */
+/** Client may send phone/email/login; all normalize to auth. */
 export const ONBOARDING_STEP_ALIASES: Record<string, OnboardingFunnelStep> = {
   phone: "auth",
+  email: "auth",
   login: "auth",
 };
 
@@ -169,7 +177,7 @@ export interface PaginatedResult<T> {
 
 export interface AuthUser {
   id: string;
-  phone: string;
+  email: string;
   displayName: string | null;
   preferredCurrency: string;
   createdAt: string;
@@ -185,7 +193,7 @@ export interface AuthTokens {
 export interface AccessTokenPayload {
   sub: string;
   typ: "access";
-  phone: string;
+  email: string;
 }
 
 export type OtpPurpose = "registration" | "new_device" | "password_reset";

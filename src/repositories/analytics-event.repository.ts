@@ -32,7 +32,7 @@ export type PaywallCohortRow = {
   started_checkout: string;
 };
 
-/** Mirrors ONBOARDING_FUNNEL_STEPS ordinals (auth = phone/login). */
+/** Mirrors ONBOARDING_FUNNEL_STEPS ordinals (auth = phone/email/login). */
 const ONBOARDING_STEP_ORDINAL_SQL = `
   CASE step
     WHEN 'welcome' THEN 1

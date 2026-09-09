@@ -16,8 +16,8 @@ import type {
 
 export interface UserRow {
   id: string;
-  phone: string;
-  email: string | null;
+  phone: string | null;
+  email: string;
   password_hash: string;
   display_name: string | null;
   preferred_currency: string;
@@ -184,7 +184,7 @@ export interface PasswordResetTokenRow {
 
 export interface OtpChallengeRow {
   id: string;
-  phone: string;
+  email: string;
   purpose: OtpPurpose;
   code_hash: string;
   user_id: string | null;

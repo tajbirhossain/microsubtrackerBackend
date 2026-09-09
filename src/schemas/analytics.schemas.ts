@@ -6,6 +6,7 @@ const uuidSchema = z.string().uuid();
 const onboardingStepValues = [
   ...ONBOARDING_FUNNEL_STEPS,
   "phone",
+  "email",
   "login",
 ] as const;
 

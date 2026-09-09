@@ -40,14 +40,14 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
       decoded === null ||
       decoded.typ !== "access" ||
       typeof decoded.sub !== "string" ||
-      typeof decoded.phone !== "string"
+      typeof decoded.email !== "string"
     ) {
       throw new AppError(401, "Invalid access token");
     }
 
     return {
       sub: decoded.sub,
-      phone: decoded.phone,
+      email: decoded.email,
       typ: "access",
     };
   } catch (error) {

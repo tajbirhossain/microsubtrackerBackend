@@ -80,7 +80,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
   const result = await authService.forgotPassword(req.body);
   res.status(202).json({
     success: true,
-    message: "If that phone number exists, an OTP was sent",
+    message: "If that email exists, an OTP was sent",
     data: result,
   });
 }

@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import config from "../config/index.js";
 import { withTransaction } from "../db/transaction.js";
+import { sendOtpEmail } from "../notifications/email.js";
 import {
   findDeviceByUserAndKey,
   upsertDevice,
@@ -20,8 +21,8 @@ import {
 } from "../repositories/refresh-token.repository.js";
 import {
   createUser,
+  findActiveUserByEmail,
   findActiveUserById,
-  findActiveUserByPhone,
   softDeleteUser,
   updatePasswordHash,
 } from "../repositories/user.repository.js";
@@ -116,7 +117,7 @@ function asRegistrationPayload(payload: Record<string, unknown>): RegistrationPa
 async function issueSession(
   input: {
     userId: string;
-    phone: string;
+    email: string;
     device: DeviceInput;
   },
   client?: PoolClient
@@ -156,14 +157,14 @@ async function issueSession(
   return {
     deviceId: device.id,
     tokens: buildTokens(
-      signAccessToken({ sub: input.userId, phone: input.phone }),
+      signAccessToken({ sub: input.userId, email: input.email }),
       refreshToken
     ),
   };
 }
 
 async function issueOtpChallenge(input: {
-  phone: string;
+  email: string;
   purpose: OtpPurpose;
   userId?: string | null;
   deviceKey?: string | null;
@@ -173,7 +174,7 @@ async function issueOtpChallenge(input: {
   const expiresAt = addSeconds(new Date(), config.auth.otpTtlSeconds);
 
   await createOtpChallenge({
-    phone: input.phone,
+    email: input.email,
     purpose: input.purpose,
     codeHash: hashToken(code),
     userId: input.userId,
@@ -183,12 +184,18 @@ async function issueOtpChallenge(input: {
     maxAttempts: config.auth.otpMaxAttempts,
   });
 
+  await sendOtpEmail({
+    to: input.email,
+    code,
+    purpose: input.purpose,
+  });
+
   if (config.isDev) {
     logger.info(
       {
         purpose: input.purpose,
-        phone: input.phone,
-        ...(config.isDev ? { code } : { code: "[redacted]" }),
+        email: input.email,
+        code,
       },
       "otp_issued"
     );
@@ -203,13 +210,13 @@ async function issueOtpChallenge(input: {
 }
 
 async function verifyOtpCode(input: {
-  phone: string;
+  email: string;
   purpose: OtpPurpose;
   code: string;
   client?: PoolClient;
 }) {
   const challenge = await findActiveOtpChallenge(
-    input.phone,
+    input.email,
     input.purpose,
     input.client
   );
@@ -239,15 +246,15 @@ async function verifyOtpCode(input: {
 export async function startRegistration(
   input: RegisterStartInput
 ): Promise<OtpSentResult> {
-  const existing = await findActiveUserByPhone(input.phone);
+  const existing = await findActiveUserByEmail(input.email);
   if (existing) {
-    throw new AppError(409, "Phone number is already registered");
+    throw new AppError(409, "Email is already registered");
   }
 
   const passwordHash = await hashPassword(input.password);
 
   return issueOtpChallenge({
-    phone: input.phone,
+    email: input.email,
     purpose: "registration",
     payload: {
       passwordHash,
@@ -263,15 +270,15 @@ export async function verifyRegistration(
 ): Promise<AuthSessionResult> {
   return withTransaction(async (client) => {
     const challenge = await verifyOtpCode({
-      phone: input.phone,
+      email: input.email,
       purpose: "registration",
       code: input.code,
       client,
     });
 
-    const existing = await findActiveUserByPhone(input.phone, client);
+    const existing = await findActiveUserByEmail(input.email, client);
     if (existing) {
-      throw new AppError(409, "Phone number is already registered");
+      throw new AppError(409, "Email is already registered");
     }
 
     const pending = asRegistrationPayload(challenge.payload);
@@ -279,10 +286,11 @@ export async function verifyRegistration(
 
     const created = await createUser(
       {
-        phone: input.phone,
+        email: input.email,
         passwordHash: pending.passwordHash,
         displayName: pending.displayName,
         preferredCurrency: pending.preferredCurrency,
+        emailVerified: true,
       },
       client
     );
@@ -292,7 +300,7 @@ export async function verifyRegistration(
     const session = await issueSession(
       {
         userId: created.id,
-        phone: created.phone,
+        email: created.email,
         device,
       },
       client
@@ -309,15 +317,15 @@ export async function verifyRegistration(
 export async function login(
   input: LoginInput
 ): Promise<AuthSessionResult | OtpSentResult> {
-  const user = await findActiveUserByPhone(input.phone);
+  const user = await findActiveUserByEmail(input.email);
   if (!user) {
     await verifyPassword(input.password, TIMING_SAFE_DUMMY_HASH);
-    throw new AppError(401, "Invalid phone number or password");
+    throw new AppError(401, "Invalid email or password");
   }
 
   const passwordOk = await verifyPassword(input.password, user.password_hash);
   if (!passwordOk) {
-    throw new AppError(401, "Invalid phone number or password");
+    throw new AppError(401, "Invalid email or password");
   }
 
   const knownDevice = await findDeviceByUserAndKey(
@@ -328,7 +336,7 @@ export async function login(
   if (knownDevice) {
     const session = await issueSession({
       userId: user.id,
-      phone: user.phone,
+      email: user.email,
       device: input.device,
     });
 
@@ -340,7 +348,7 @@ export async function login(
   }
 
   return issueOtpChallenge({
-    phone: user.phone,
+    email: user.email,
     purpose: "new_device",
     userId: user.id,
     deviceKey: input.device.deviceKey,
@@ -355,7 +363,7 @@ export async function verifyNewDeviceLogin(
 ): Promise<AuthSessionResult> {
   return withTransaction(async (client) => {
     const challenge = await verifyOtpCode({
-      phone: input.phone,
+      email: input.email,
       purpose: "new_device",
       code: input.code,
       client,
@@ -380,7 +388,7 @@ export async function verifyNewDeviceLogin(
     const session = await issueSession(
       {
         userId: user.id,
-        phone: user.phone,
+        email: user.email,
         device: input.device,
       },
       client
@@ -437,7 +445,7 @@ export async function refresh(input: RefreshInput): Promise<AuthSessionResult> {
       user: toAuthUser(user),
       deviceId: stored.device_id,
       tokens: buildTokens(
-        signAccessToken({ sub: user.id, phone: user.phone }),
+        signAccessToken({ sub: user.id, email: user.email }),
         nextRefreshToken
       ),
     };
@@ -479,13 +487,13 @@ export async function logout(
 export async function forgotPassword(
   input: ForgotPasswordInput
 ): Promise<OtpSentResult | { sent: true }> {
-  const user = await findActiveUserByPhone(input.phone);
+  const user = await findActiveUserByEmail(input.email);
   if (!user) {
     return { sent: true };
   }
 
   return issueOtpChallenge({
-    phone: user.phone,
+    email: user.email,
     purpose: "password_reset",
     userId: user.id,
   });
@@ -496,7 +504,7 @@ export async function resetPassword(
 ): Promise<{ reset: true }> {
   await withTransaction(async (client) => {
     const challenge = await verifyOtpCode({
-      phone: input.phone,
+      email: input.email,
       purpose: "password_reset",
       code: input.code,
       client,
@@ -515,13 +523,13 @@ export async function resetPassword(
 }
 
 export async function resendOtp(input: ResendOtpInput): Promise<OtpSentResult> {
-  const active = await findActiveOtpChallenge(input.phone, input.purpose);
+  const active = await findActiveOtpChallenge(input.email, input.purpose);
   if (!active) {
     throw new AppError(400, "No active OTP challenge to resend");
   }
 
   return issueOtpChallenge({
-    phone: active.phone,
+    email: active.email,
     purpose: active.purpose,
     userId: active.user_id,
     deviceKey: active.device_key,

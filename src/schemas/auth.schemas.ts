@@ -1,13 +1,11 @@
 import { z } from "zod";
 
-/** E.164: + followed by 8–15 digits total (country code + subscriber number). */
-export const phoneSchema = z
+export const emailSchema = z
   .string()
   .trim()
-  .transform((value) => value.replace(/[\s()-]/g, ""))
-  .refine((value) => /^\+[1-9]\d{7,14}$/.test(value), {
-    message: "Phone must be E.164 format, e.g. +15551234567",
-  });
+  .toLowerCase()
+  .max(254)
+  .email("Enter a valid email address");
 
 export const otpCodeSchema = z
   .string()
@@ -23,7 +21,7 @@ export const deviceSchema = z.object({
 
 export const registerStartSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     password: z.string().min(8).max(72),
     displayName: z.string().trim().min(1).max(80).optional(),
     preferredCurrency: z
@@ -38,7 +36,7 @@ export const registerStartSchema = z
 
 export const registerVerifySchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     code: otpCodeSchema,
     device: deviceSchema,
   })
@@ -46,7 +44,7 @@ export const registerVerifySchema = z
 
 export const loginSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     password: z.string().min(1).max(72),
     device: deviceSchema,
   })
@@ -54,7 +52,7 @@ export const loginSchema = z
 
 export const loginVerifyDeviceSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     code: otpCodeSchema,
     device: deviceSchema,
   })
@@ -75,13 +73,13 @@ export const logoutSchema = z
 
 export const forgotPasswordSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
   })
   .strict();
 
 export const resetPasswordSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     code: otpCodeSchema,
     password: z.string().min(8).max(72),
   })
@@ -89,7 +87,7 @@ export const resetPasswordSchema = z
 
 export const resendOtpSchema = z
   .object({
-    phone: phoneSchema,
+    email: emailSchema,
     purpose: z.enum(["registration", "new_device", "password_reset"]),
   })
   .strict();
