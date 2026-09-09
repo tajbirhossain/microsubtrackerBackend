@@ -2,7 +2,10 @@ import pg from "pg";
 import config, { toPoolConfig } from "../config/index.js";
 import { logger } from "../observability/logger.js";
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Keep Postgres DATE as calendar YYYY-MM-DD (never a JS Date / UTC shift).
+types.setTypeParser(types.builtins.DATE, (value: string) => value);
 
 export const pool = new Pool(toPoolConfig(config.database));
 

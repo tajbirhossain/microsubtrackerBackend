@@ -33,11 +33,16 @@ export function toDateKey(value: Date | string | null | undefined): string | nul
     if (match?.[1]) return match[1];
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return null;
-    return parsed.toISOString().slice(0, 10);
+    // Fall back to local calendar day (avoids UTC day-shift for local midnights).
+    const y = parsed.getFullYear();
+    const m = `${parsed.getMonth() + 1}`.padStart(2, "0");
+    const d = `${parsed.getDate()}`.padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   if (Number.isNaN(value.getTime())) return null;
-  const y = value.getUTCFullYear();
-  const m = `${value.getUTCMonth() + 1}`.padStart(2, "0");
-  const d = `${value.getUTCDate()}`.padStart(2, "0");
+  // node-pg historically built DATE as local midnight — use local parts, not UTC.
+  const y = value.getFullYear();
+  const m = `${value.getMonth() + 1}`.padStart(2, "0");
+  const d = `${value.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
