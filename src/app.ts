@@ -71,8 +71,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "1mb", strict: true }));
-app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+app.use(express.json({ limit: "8mb", strict: true }));
+app.use(express.urlencoded({ extended: false, limit: "8mb" }));
 app.use(requireJsonContentType);
 app.use(rejectClientUserId);
 app.use(requestLoggingMiddleware);

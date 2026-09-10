@@ -48,6 +48,11 @@ export interface PushConfig {
   forceLog: boolean;
 }
 
+export interface GeminiConfig {
+  apiKey: string | null;
+  model: string;
+}
+
 export interface SecurityConfig {
   corsOrigins: string[];
   trustProxy: boolean;
@@ -65,6 +70,7 @@ export interface AppConfig {
   redis: RedisConfig;
   jobs: JobsConfig;
   push: PushConfig;
+  gemini: GeminiConfig;
   security: SecurityConfig;
 }
 
@@ -90,7 +96,11 @@ export type BillingCycle = "weekly" | "monthly" | "yearly";
 export type SpendScale = "micro" | "macro";
 export type SubscriptionStatus = "active" | "cancelled" | "paused";
 export type DevicePlatform = "android" | "ios" | "web";
-export type ParserSourceType = "sms" | "notification";
+export type ParserSourceType =
+  | "sms"
+  | "notification"
+  | "paste"
+  | "receipt_image";
 export type ParserEventStatus =
   | "pending"
   | "classified"

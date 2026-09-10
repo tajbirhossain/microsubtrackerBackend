@@ -2,7 +2,11 @@ import { MERCHANT_PATTERNS, type MerchantPattern } from "./merchants.js";
 
 export const LOW_CONFIDENCE_THRESHOLD = 0.7;
 
-export type ParserSourceType = "sms" | "notification";
+export type ParserSourceType =
+  | "sms"
+  | "notification"
+  | "paste"
+  | "receipt_image";
 
 export type NormalizedPayload = {
   text: string;

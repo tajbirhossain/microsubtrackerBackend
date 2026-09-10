@@ -212,6 +212,10 @@ export function loadConfig(): AppConfig {
         optionalEnv("PUSH_FORCE_LOG", isDev ? "true" : "false").toLowerCase() ===
         "true",
     },
+    gemini: {
+      apiKey: optionalEnv("GEMINI_API_KEY", "") || null,
+      model: optionalEnv("GEMINI_MODEL", "gemini-3.6-flash"),
+    },
     security: {
       corsOrigins: parseCorsOrigins(
         optionalEnv("CORS_ORIGINS", isDev ? "*" : "*")

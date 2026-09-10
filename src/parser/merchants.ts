@@ -10,6 +10,23 @@ export type MerchantPattern = {
 
 export const MERCHANT_PATTERNS: MerchantPattern[] = [
   {
+    key: "google",
+    name: "Google",
+    aliases: [
+      "google play developer",
+      "developer registration fee",
+      "google play console",
+      "google workspace",
+      "google one",
+      "google play",
+      "google",
+    ],
+    categorySlug: "productivity",
+    defaultBillingCycle: "yearly",
+    color: "#4285F4",
+    icon: "G",
+  },
+  {
     key: "netflix",
     name: "Netflix",
     aliases: ["netflix", "nflx"],
