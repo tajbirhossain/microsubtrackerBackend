@@ -68,15 +68,18 @@ async function sendViaResend(input: {
       { status: response.status, body: body.slice(0, 300), to: input.to },
       "otp_email_send_failed"
     );
+
+    if (response.status === 403 || response.status === 422) {
+      throw new AppError(
+        502,
+        "Failed to send verification email. Check RESEND_API_KEY and EMAIL_FROM."
+      );
+    }
+
     throw new AppError(502, "Failed to send verification email");
   }
 }
 
-/**
- * Deliver an OTP email.
- * - `log` provider: free forever (dev / portfolio). Code is logged, not emailed.
- * - `resend` provider: Resend free tier (~100 emails/day) for real delivery.
- */
 export async function sendOtpEmail(input: {
   to: string;
   code: string;
@@ -86,13 +89,17 @@ export async function sendOtpEmail(input: {
   const provider = config.email.provider;
 
   if (provider === "log") {
+    if (!config.isDev) {
+      throw new AppError(503, "Email delivery is not configured");
+    }
+
     logger.info(
       {
         provider,
         to: input.to,
         purpose: input.purpose,
         subject: content.subject,
-        ...(config.isDev ? { code: input.code } : { code: "[redacted]" }),
+        code: input.code,
       },
       "otp_email_logged"
     );

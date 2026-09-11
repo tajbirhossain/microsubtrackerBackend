@@ -155,21 +155,30 @@ export function loadConfig(): AppConfig {
       appPublicUrl: optionalEnv("APP_PUBLIC_URL", "http://localhost:5000"),
     },
     email: (() => {
-      const hasResendKey = Boolean(optionalEnv("RESEND_API_KEY", ""));
+      const resendApiKey = optionalEnv("RESEND_API_KEY", "") || null;
+      const hasResendKey = Boolean(resendApiKey);
       const providerRaw = optionalEnv(
         "EMAIL_PROVIDER",
         hasResendKey ? "resend" : "log"
       ).toLowerCase();
-      const provider =
-        providerRaw === "resend" || providerRaw === "log"
-          ? providerRaw
-          : (() => {
-              throw new Error("EMAIL_PROVIDER must be log or resend");
-            })();
-      const resendApiKey = optionalEnv("RESEND_API_KEY", "") || null;
-      if (provider === "resend" && !resendApiKey) {
+
+      if (providerRaw !== "resend" && providerRaw !== "log") {
+        throw new Error("EMAIL_PROVIDER must be log or resend");
+      }
+
+      let provider: "log" | "resend" = providerRaw;
+
+      if (!isDev) {
+        if (!hasResendKey) {
+          throw new Error(
+            "RESEND_API_KEY is required when NODE_ENV=production"
+          );
+        }
+        provider = "resend";
+      } else if (provider === "resend" && !hasResendKey) {
         throw new Error("RESEND_API_KEY is required when EMAIL_PROVIDER=resend");
       }
+
       return {
         provider,
         from: optionalEnv(
