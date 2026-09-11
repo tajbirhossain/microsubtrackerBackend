@@ -4,7 +4,14 @@ import { captureErrorFromRequest } from "../observability/errors.js";
 import { isAppError } from "../utils/errors.js";
 import type { HttpError } from "../types/index.js";
 
-function publicMessage(statusCode: number, message: string): string {
+function publicMessage(
+  statusCode: number,
+  message: string,
+  isAppError: boolean
+): string {
+  if (isAppError) {
+    return message || "Request failed";
+  }
   if (statusCode >= 500 && !config.isDev) {
     return "Internal Server Error";
   }
@@ -22,7 +29,8 @@ export function errorHandler(
   const message = publicMessage(
     statusCode,
     appErr?.message ??
-      (err instanceof Error ? err.message : "Internal Server Error")
+      (err instanceof Error ? err.message : "Internal Server Error"),
+    Boolean(appErr)
   );
 
   if (statusCode >= 500) {

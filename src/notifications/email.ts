@@ -72,11 +72,11 @@ async function sendViaResend(input: {
     if (response.status === 403 || response.status === 422) {
       throw new AppError(
         502,
-        "Failed to send verification email. Check RESEND_API_KEY and EMAIL_FROM."
+        "Couldn't send the verification email. Check that the address is valid and try again."
       );
     }
 
-    throw new AppError(502, "Failed to send verification email");
+    throw new AppError(502, "Couldn't send the verification email. Please try again.");
   }
 }
 
@@ -90,7 +90,7 @@ export async function sendOtpEmail(input: {
 
   if (provider === "log") {
     if (!config.isDev) {
-      throw new AppError(503, "Email delivery is not configured");
+      throw new AppError(503, "Couldn't send the verification email. Please try again later.");
     }
 
     logger.info(
