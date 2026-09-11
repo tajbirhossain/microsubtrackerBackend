@@ -92,6 +92,12 @@ export const resendOtpSchema = z
   })
   .strict();
 
+export const updateProfileSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(80),
+  })
+  .strict();
+
 export type RegisterStartInput = z.infer<typeof registerStartSchema>;
 export type RegisterVerifyInput = z.infer<typeof registerVerifySchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -102,3 +108,4 @@ export type DeviceInput = z.infer<typeof deviceSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

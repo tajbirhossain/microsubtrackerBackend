@@ -76,6 +76,15 @@ export async function me(req: Request, res: Response): Promise<void> {
   });
 }
 
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  const user = await authService.updateProfile(req.user!.id, req.body);
+  res.json({
+    success: true,
+    message: "Profile updated",
+    data: { user },
+  });
+}
+
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   const result = await authService.forgotPassword(req.body);
   res.status(202).json({

@@ -24,6 +24,7 @@ import {
   findActiveUserByEmail,
   findActiveUserById,
   softDeleteUser,
+  updateDisplayName,
   updatePasswordHash,
 } from "../repositories/user.repository.js";
 import type {
@@ -37,6 +38,7 @@ import type {
   RegisterVerifyInput,
   ResendOtpInput,
   ResetPasswordInput,
+  UpdateProfileInput,
 } from "../schemas/auth.schemas.js";
 import type { AuthTokens, AuthUser, OtpPurpose } from "../types/index.js";
 import { AppError } from "../utils/errors.js";
@@ -555,4 +557,15 @@ export async function getCurrentUser(userId: string): Promise<AuthUser> {
     throw new AppError(404, "User not found");
   }
   return toAuthUser(user);
+}
+
+export async function updateProfile(
+  userId: string,
+  input: UpdateProfileInput
+): Promise<AuthUser> {
+  const updated = await updateDisplayName(userId, input.displayName);
+  if (!updated) {
+    throw new AppError(404, "User not found");
+  }
+  return toAuthUser(updated);
 }

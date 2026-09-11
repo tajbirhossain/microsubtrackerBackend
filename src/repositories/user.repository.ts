@@ -100,6 +100,24 @@ export async function updatePasswordHash(
   );
 }
 
+export async function updateDisplayName(
+  userId: string,
+  displayName: string,
+  client?: Queryable
+): Promise<UserRow | null> {
+  return queryOne<UserRow>(
+    `
+      UPDATE users
+      SET display_name = $2
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING *
+    `,
+    [userId, displayName],
+    client
+  );
+}
+
 export async function softDeleteUser(
   userId: string,
   client?: Queryable

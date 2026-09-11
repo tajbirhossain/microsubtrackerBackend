@@ -13,6 +13,7 @@ import {
   registerVerifySchema,
   resendOtpSchema,
   resetPasswordSchema,
+  updateProfileSchema,
 } from "../schemas/auth.schemas.js";
 import config from "../config/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -69,6 +70,13 @@ router.post(
 );
 
 router.get("/me", asyncHandler(requireAuth), asyncHandler(authController.me));
+
+router.patch(
+  "/me",
+  asyncHandler(requireAuth),
+  validateRequest(updateProfileSchema),
+  asyncHandler(authController.updateProfile)
+);
 
 router.post(
   "/forgot-password",
