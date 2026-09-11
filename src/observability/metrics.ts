@@ -15,9 +15,14 @@ function dayKey(date = new Date()): string {
 }
 
 async function incr(key: string, by = 1): Promise<void> {
+  // Redis INCRBY requires integers; request durations are often fractional ms.
+  const amount = Math.round(by);
+  if (!Number.isFinite(amount)) {
+    return;
+  }
   try {
-    const count = await redis.incrby(key, by);
-    if (count === by) {
+    const count = await redis.incrby(key, amount);
+    if (count === amount) {
       await redis.expire(key, 60 * 60 * 24 * 14);
     }
   } catch (error) {
