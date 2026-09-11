@@ -64,10 +64,33 @@ async function sendViaResend(input: {
 
   if (!response.ok) {
     const body = await response.text();
+    let resendMessage = "";
+    try {
+      const parsed = JSON.parse(body) as { message?: string };
+      resendMessage = typeof parsed.message === "string" ? parsed.message : "";
+    } catch {
+      resendMessage = "";
+    }
+
     logger.error(
-      { status: response.status, body: body.slice(0, 300), to: input.to },
+      {
+        status: response.status,
+        body: body.slice(0, 300),
+        to: input.to,
+        resendMessage: resendMessage || undefined,
+      },
       "otp_email_send_failed"
     );
+
+    const testingOnly =
+      /only send testing emails to your own email address/i.test(resendMessage);
+
+    if (testingOnly) {
+      throw new AppError(
+        502,
+        "Verification email could not be delivered to this address yet. Use the Gmail linked to your Resend account, or verify a sending domain in Resend."
+      );
+    }
 
     if (response.status === 403 || response.status === 422) {
       throw new AppError(
