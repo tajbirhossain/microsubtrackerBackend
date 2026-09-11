@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.log
+.DS_Store
+coverage
+jest.config.cjs
+jest.setup.cjs
+tsconfig.jest.json
+src/**/__tests__
