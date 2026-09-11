@@ -1,8 +1,34 @@
+import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import pino, { type Logger } from "pino";
 import config from "../config/index.js";
 
 const level = process.env.LOG_LEVEL?.trim() || (config.isDev ? "debug" : "info");
+
+/** Pretty logs only when the package is installed (local dev). Never on Render/Docker prod. */
+function prettyTransport():
+  | { transport: { target: string; options: Record<string, unknown> } }
+  | Record<string, never> {
+  if (!config.isDev || process.env.RENDER === "true") {
+    return {};
+  }
+  try {
+    const require = createRequire(import.meta.url);
+    const target = require.resolve("pino-pretty");
+    return {
+      transport: {
+        target,
+        options: {
+          colorize: true,
+          translateTime: "SYS:standard",
+          ignore: "pid,hostname",
+        },
+      },
+    };
+  } catch {
+    return {};
+  }
+}
 
 export const logger: Logger = pino({
   level,
@@ -26,18 +52,7 @@ export const logger: Logger = pino({
     ],
     censor: "[Redacted]",
   },
-  ...(config.isDev
-    ? {
-        transport: {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-            translateTime: "SYS:standard",
-            ignore: "pid,hostname",
-          },
-        },
-      }
-    : {}),
+  ...prettyTransport(),
 });
 
 export function childLogger(bindings: Record<string, unknown>): Logger {
