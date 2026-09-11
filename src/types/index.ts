@@ -41,6 +41,8 @@ export interface JobsConfig {
   concurrency: number;
   attempts: number;
   backoffMs: number;
+  /** When true, BullMQ worker runs inside the API process (free-tier / single-service). */
+  runInApi: boolean;
 }
 
 export interface PushConfig {

@@ -205,6 +205,12 @@ export function loadConfig(): AppConfig {
       concurrency: optionalPositiveInt("JOB_CONCURRENCY", 5),
       attempts: optionalPositiveInt("JOB_ATTEMPTS", 5),
       backoffMs: optionalPositiveInt("JOB_BACKOFF_MS", 2000),
+      // On Render free tier there is no Background Worker — embed by default.
+      runInApi:
+        optionalEnv(
+          "RUN_WORKER_IN_API",
+          process.env.RENDER === "true" ? "true" : "false"
+        ).toLowerCase() === "true",
     },
     push: {
       expoAccessToken: optionalEnv("EXPO_ACCESS_TOKEN", "") || null,
