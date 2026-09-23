@@ -138,8 +138,9 @@ export async function softDeleteUser(
 export type BillingEntitlementInput = {
   planTier: "plus" | "pro" | null;
   planStatus: "none" | "active" | "past_due" | "canceled";
-  paddleCustomerId?: string | null;
-  paddleSubscriptionId?: string | null;
+  googleProductId?: string | null;
+  googlePurchaseToken?: string | null;
+  googleOrderId?: string | null;
 };
 
 export async function updateBillingEntitlement(
@@ -153,8 +154,9 @@ export async function updateBillingEntitlement(
       SET
         plan_tier = $2,
         plan_status = $3,
-        paddle_customer_id = COALESCE($4, paddle_customer_id),
-        paddle_subscription_id = COALESCE($5, paddle_subscription_id),
+        google_product_id = COALESCE($4, google_product_id),
+        google_purchase_token = COALESCE($5, google_purchase_token),
+        google_order_id = COALESCE($6, google_order_id),
         plan_updated_at = NOW()
       WHERE id = $1
         AND deleted_at IS NULL
@@ -164,43 +166,27 @@ export async function updateBillingEntitlement(
       userId,
       input.planTier,
       input.planStatus,
-      input.paddleCustomerId ?? null,
-      input.paddleSubscriptionId ?? null,
+      input.googleProductId ?? null,
+      input.googlePurchaseToken ?? null,
+      input.googleOrderId ?? null,
     ],
     client
   );
 }
 
-export async function findActiveUserByPaddleCustomerId(
-  paddleCustomerId: string,
+export async function findActiveUserByGooglePurchaseToken(
+  purchaseToken: string,
   client?: Queryable
 ): Promise<UserRow | null> {
   return queryOne<UserRow>(
     `
       SELECT *
       FROM users
-      WHERE paddle_customer_id = $1
+      WHERE google_purchase_token = $1
         AND deleted_at IS NULL
       LIMIT 1
     `,
-    [paddleCustomerId],
-    client
-  );
-}
-
-export async function findActiveUserByPaddleSubscriptionId(
-  paddleSubscriptionId: string,
-  client?: Queryable
-): Promise<UserRow | null> {
-  return queryOne<UserRow>(
-    `
-      SELECT *
-      FROM users
-      WHERE paddle_subscription_id = $1
-        AND deleted_at IS NULL
-      LIMIT 1
-    `,
-    [paddleSubscriptionId],
+    [purchaseToken],
     client
   );
 }

@@ -55,13 +55,10 @@ export interface GeminiConfig {
   model: string;
 }
 
-export interface PaddleConfig {
-  env: "sandbox" | "live";
-  apiKey: string | null;
-  clientToken: string | null;
-  webhookSecret: string | null;
-  apiBaseUrl: string;
-  prices: {
+export interface GooglePlayConfig {
+  packageName: string | null;
+  serviceAccountJson: string | null;
+  products: {
     plus: string | null;
     pro: string | null;
   };
@@ -85,7 +82,7 @@ export interface AppConfig {
   jobs: JobsConfig;
   push: PushConfig;
   gemini: GeminiConfig;
-  paddle: PaddleConfig;
+  googlePlay: GooglePlayConfig;
   security: SecurityConfig;
 }
 

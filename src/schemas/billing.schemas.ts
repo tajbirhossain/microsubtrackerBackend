@@ -1,12 +1,9 @@
 import { z } from "zod";
 
-export const checkoutBodySchema = z.object({
-  plan: z.enum(["plus", "pro"]),
+export const googleConfirmBodySchema = z.object({
+  productId: z.string().min(1),
+  purchaseToken: z.string().min(10),
+  packageName: z.string().min(3).optional(),
 });
 
-export const confirmBodySchema = z.object({
-  transactionId: z.string().min(3),
-});
-
-export type CheckoutBody = z.infer<typeof checkoutBodySchema>;
-export type ConfirmBody = z.infer<typeof confirmBodySchema>;
+export type GoogleConfirmBody = z.infer<typeof googleConfirmBodySchema>;

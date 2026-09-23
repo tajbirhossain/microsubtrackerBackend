@@ -85,27 +85,12 @@ Manual on the VPS anytime:
 bash /var/www/microsubtrackerBackend/scripts/deploy.sh
 ```
 
-## Paddle Billing (sandbox)
+## Google Play Billing
 
 Env (see `.env.example`):
 
-- `PADDLE_ENV=sandbox`
-- `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`
-- `PADDLE_PRICE_PLUS`, `PADDLE_PRICE_PRO`
+- `GOOGLE_PLAY_PACKAGE_NAME=com.tajbirhossain.microsubtracker`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` — path to service-account JSON, or raw JSON
+- `GOOGLE_PLAY_PRODUCT_PLUS`, `GOOGLE_PLAY_PRODUCT_PRO` — Play Console subscription product IDs
 
-In the Paddle sandbox dashboard:
-
-1. **Checkout → Checkout settings → Default payment link**  
-   set to: `https://api.microsubtracker.tajbirhossain.com/checkout`
-2. Approve that domain under checkout website allowlist if prompted.
-3. Notification destination:  
-   `https://api.microsubtracker.tajbirhossain.com/api/billing/webhooks`
-
-Also set on the VPS:
-
-```env
-APP_PUBLIC_URL=https://api.microsubtracker.tajbirhossain.com
-PADDLE_CLIENT_TOKEN=test_...
-```
-
-`checkout.url` from Paddle is `default payment link + ?_ptxn=txn_…`. If the default is localhost, the app opens localhost — override it via dashboard + `checkout.url` on create.
+Confirm purchases from the app with `POST /api/billing/google/confirm`. Run `npm run migrate` after pulling so `012_play_billing.sql` applies.

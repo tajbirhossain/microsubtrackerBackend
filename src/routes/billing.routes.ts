@@ -2,23 +2,16 @@ import { Router } from "express";
 import * as billingController from "../controllers/billing.controller.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { validateRequest } from "../middleware/validate.js";
-import { checkoutBodySchema, confirmBodySchema } from "../schemas/billing.schemas.js";
+import { googleConfirmBodySchema } from "../schemas/billing.schemas.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
 
 router.post(
-  "/checkout",
+  "/google/confirm",
   asyncHandler(requireAuth),
-  validateRequest(checkoutBodySchema, "body"),
-  asyncHandler(billingController.startCheckout)
-);
-
-router.post(
-  "/confirm",
-  asyncHandler(requireAuth),
-  validateRequest(confirmBodySchema, "body"),
-  asyncHandler(billingController.confirmCheckout)
+  validateRequest(googleConfirmBodySchema, "body"),
+  asyncHandler(billingController.confirmGooglePurchase)
 );
 
 router.get(
@@ -26,7 +19,5 @@ router.get(
   asyncHandler(requireAuth),
   asyncHandler(billingController.getStatus)
 );
-
-router.post("/webhooks", asyncHandler(billingController.handleWebhook));
 
 export default router;

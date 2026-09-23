@@ -231,25 +231,19 @@ export function loadConfig(): AppConfig {
       apiKey: optionalEnv("GEMINI_API_KEY", "") || null,
       model: optionalEnv("GEMINI_MODEL", "gemini-3.6-flash"),
     },
-    paddle: (() => {
-      const paddleEnvRaw = optionalEnv("PADDLE_ENV", "sandbox").toLowerCase();
-      const paddleEnv =
-        paddleEnvRaw === "live" ? ("live" as const) : ("sandbox" as const);
-      return {
-        env: paddleEnv,
-        apiKey: optionalEnv("PADDLE_API_KEY", "") || null,
-        clientToken: optionalEnv("PADDLE_CLIENT_TOKEN", "") || null,
-        webhookSecret: optionalEnv("PADDLE_WEBHOOK_SECRET", "") || null,
-        apiBaseUrl:
-          paddleEnv === "live"
-            ? "https://api.paddle.com"
-            : "https://sandbox-api.paddle.com",
-        prices: {
-          plus: optionalEnv("PADDLE_PRICE_PLUS", "") || null,
-          pro: optionalEnv("PADDLE_PRICE_PRO", "") || null,
-        },
-      };
-    })(),
+    googlePlay: {
+      packageName:
+        optionalEnv(
+          "GOOGLE_PLAY_PACKAGE_NAME",
+          "com.tajbirhossain.microsubtracker"
+        ) || null,
+      serviceAccountJson:
+        optionalEnv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "") || null,
+      products: {
+        plus: optionalEnv("GOOGLE_PLAY_PRODUCT_PLUS", "plus_monthly") || null,
+        pro: optionalEnv("GOOGLE_PLAY_PRODUCT_PRO", "pro_monthly") || null,
+      },
+    },
     security: {
       corsOrigins: parseCorsOrigins(
         optionalEnv("CORS_ORIGINS", isDev ? "*" : "*")

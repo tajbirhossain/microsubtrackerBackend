@@ -25,8 +25,9 @@ export interface UserRow {
   deleted_at: Date | null;
   plan_tier: "plus" | "pro" | null;
   plan_status: "none" | "active" | "past_due" | "canceled";
-  paddle_customer_id: string | null;
-  paddle_subscription_id: string | null;
+  google_product_id: string | null;
+  google_purchase_token: string | null;
+  google_order_id: string | null;
   plan_updated_at: Date | null;
   created_at: Date;
   updated_at: Date;
