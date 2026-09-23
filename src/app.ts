@@ -166,9 +166,19 @@ app.get("/billing/return", (_req, res) => {
     <title>Returning to Micro Sub Tracker…</title>
     <meta http-equiv="refresh" content="0;url=microsubtracker://billing/return" />
   </head>
-  <body style="font-family: system-ui, sans-serif; background:#0b0b0c; color:#fff; display:flex; min-height:100vh; align-items:center; justify-content:center;">
-    <p>Payment received. Returning to the app…<br/><a style="color:#5B9EFF" href="microsubtracker://billing/return">Tap here if nothing happens</a></p>
-    <script>window.location.replace("microsubtracker://billing/return");</script>
+  <body style="font-family: system-ui, sans-serif; background:#0b0b0c; color:#fff; display:flex; min-height:100vh; align-items:center; justify-content:center; text-align:center; padding:24px;">
+    <div>
+      <p style="font-size:20px;font-weight:600;margin:0 0 8px;">Payment completed</p>
+      <p style="opacity:.75;margin:0;">You can return to Micro Sub Tracker.</p>
+      <p style="margin-top:16px;"><a style="color:#5B9EFF" href="microsubtracker://billing/return">Open the app</a></p>
+    </div>
+    <script>
+      // Prefer closing the Expo auth session via https return URL;
+      // deep link is a fallback if the browser stays open.
+      setTimeout(function () {
+        window.location.replace("microsubtracker://billing/return");
+      }, 400);
+    </script>
   </body>
 </html>`);
 });

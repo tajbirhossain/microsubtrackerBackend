@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as billingController from "../controllers/billing.controller.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { validateRequest } from "../middleware/validate.js";
-import { checkoutBodySchema } from "../schemas/billing.schemas.js";
+import { checkoutBodySchema, confirmBodySchema } from "../schemas/billing.schemas.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
@@ -12,6 +12,13 @@ router.post(
   asyncHandler(requireAuth),
   validateRequest(checkoutBodySchema, "body"),
   asyncHandler(billingController.startCheckout)
+);
+
+router.post(
+  "/confirm",
+  asyncHandler(requireAuth),
+  validateRequest(confirmBodySchema, "body"),
+  asyncHandler(billingController.confirmCheckout)
 );
 
 router.get(

@@ -2,6 +2,7 @@ import config from "../config/index.js";
 import { AppError } from "../utils/errors.js";
 import {
   createCheckoutTransaction,
+  getPaddleTransaction,
   planFromPriceId,
 } from "./paddle.client.js";
 import { verifyPaddleWebhookSignature } from "./paddle.webhook.js";
@@ -48,6 +49,78 @@ export async function getBillingStatus(userId: string): Promise<{
     planStatus: user.plan_status ?? "none",
     paddleCustomerId: user.paddle_customer_id,
     paddleSubscriptionId: user.paddle_subscription_id,
+  };
+}
+
+/**
+ * App calls this after checkout closes so unlock doesn't depend only on webhooks.
+ */
+export async function confirmCheckout(input: {
+  userId: string;
+  transactionId: string;
+}): Promise<{
+  planTier: PlanTier | null;
+  planStatus: PlanStatus;
+  paid: boolean;
+}> {
+  const txn = await getPaddleTransaction(input.transactionId);
+  const status = typeof txn.status === "string" ? txn.status : "";
+  const paid =
+    status === "completed" ||
+    status === "paid" ||
+    status === "billed";
+
+  if (!paid) {
+    const current = await getBillingStatus(input.userId);
+    return {
+      planTier: current.planTier,
+      planStatus: current.planStatus,
+      paid: current.planStatus === "active",
+    };
+  }
+
+  const custom = asRecord(txn.custom_data);
+  const customUserId =
+    typeof custom?.userId === "string"
+      ? custom.userId
+      : typeof custom?.user_id === "string"
+        ? custom.user_id
+        : null;
+
+  if (customUserId && customUserId !== input.userId) {
+    throw new AppError(403, "Transaction does not belong to this user");
+  }
+
+  const priceId = readPriceId(txn);
+  const planTier =
+    planFromPriceId(priceId) ??
+    (typeof custom?.plan === "string" ? (custom.plan as PlanTier) : null);
+
+  const customerId =
+    typeof txn.customer_id === "string" ? txn.customer_id : null;
+  const subscriptionId =
+    typeof txn.subscription_id === "string" ? txn.subscription_id : null;
+
+  await userRepo.updateBillingEntitlement(input.userId, {
+    planTier: planTier,
+    planStatus: "active",
+    paddleCustomerId: customerId,
+    paddleSubscriptionId: subscriptionId,
+  });
+
+  logger.info(
+    {
+      user_id: input.userId,
+      transaction_id: input.transactionId,
+      plan_tier: planTier,
+    },
+    "paddle_checkout_confirmed"
+  );
+
+  return {
+    planTier,
+    planStatus: "active",
+    paid: true,
   };
 }
 

@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import * as billingService from "../billing/billing.service.js";
 import { AppError } from "../utils/errors.js";
-import type { CheckoutBody } from "../schemas/billing.schemas.js";
+import type { CheckoutBody, ConfirmBody } from "../schemas/billing.schemas.js";
 
 export async function startCheckout(req: Request, res: Response): Promise<void> {
   const user = req.user;
@@ -17,6 +17,24 @@ export async function startCheckout(req: Request, res: Response): Promise<void> 
   });
 
   res.status(201).json({
+    success: true,
+    data: result,
+  });
+}
+
+export async function confirmCheckout(req: Request, res: Response): Promise<void> {
+  const user = req.user;
+  if (!user) {
+    throw new AppError(401, "Unauthorized");
+  }
+
+  const body = req.body as ConfirmBody;
+  const result = await billingService.confirmCheckout({
+    userId: user.id,
+    transactionId: body.transactionId,
+  });
+
+  res.json({
     success: true,
     data: result,
   });

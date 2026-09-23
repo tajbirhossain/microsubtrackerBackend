@@ -125,3 +125,12 @@ export async function createCheckoutTransaction(input: {
     checkoutUrl,
   };
 }
+
+export async function getPaddleTransaction(
+  transactionId: string
+): Promise<Record<string, unknown>> {
+  const data = await paddleFetch<Record<string, unknown>>(
+    `/transactions/${encodeURIComponent(transactionId)}`
+  );
+  return data;
+}
