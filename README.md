@@ -93,10 +93,19 @@ Env (see `.env.example`):
 - `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`
 - `PADDLE_PRICE_PLUS`, `PADDLE_PRICE_PRO`
 
-In the Paddle sandbox dashboard, add a notification destination:
+In the Paddle sandbox dashboard:
 
-`https://api.microsubtracker.tajbirhossain.com/api/billing/webhooks`
+1. **Checkout → Checkout settings → Default payment link**  
+   set to: `https://api.microsubtracker.tajbirhossain.com/checkout`
+2. Approve that domain under checkout website allowlist if prompted.
+3. Notification destination:  
+   `https://api.microsubtracker.tajbirhossain.com/api/billing/webhooks`
 
-Subscribe at least to: `transaction.completed`, `subscription.activated`, `subscription.updated`, `subscription.canceled`.
+Also set on the VPS:
 
-Checkout flow: `POST /api/billing/checkout` → app opens hosted checkout URL → webhook updates `users.plan_*`.
+```env
+APP_PUBLIC_URL=https://api.microsubtracker.tajbirhossain.com
+PADDLE_CLIENT_TOKEN=test_...
+```
+
+`checkout.url` from Paddle is `default payment link + ?_ptxn=txn_…`. If the default is localhost, the app opens localhost — override it via dashboard + `checkout.url` on create.

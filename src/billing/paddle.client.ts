@@ -39,6 +39,17 @@ export function planFromPriceId(priceId: string | null | undefined): PlanTier | 
   return null;
 }
 
+function publicCheckoutBaseUrl(): string {
+  const base = config.auth.appPublicUrl.replace(/\/$/, "");
+  if (!base.startsWith("https://") || base.includes("localhost")) {
+    throw new AppError(
+      503,
+      "APP_PUBLIC_URL must be a public https URL (not localhost) for Paddle checkout"
+    );
+  }
+  return base;
+}
+
 async function paddleFetch<T>(
   path: string,
   init?: RequestInit
@@ -73,9 +84,13 @@ export async function createCheckoutTransaction(input: {
   plan: PlanTier;
   userId: string;
   email: string;
-  successUrl: string;
 }): Promise<PaddleCheckoutTransaction> {
   const priceId = priceIdForPlan(input.plan);
+  const base = publicCheckoutBaseUrl();
+  // Override Paddle's default payment link (often localhost in sandbox).
+  // Resulting checkout.url = `${base}/checkout?_ptxn=txn_...`
+  const checkoutPageUrl = `${base}/checkout`;
+  const successUrl = `${base}/billing/return`;
 
   const data = await paddleFetch<CreateTransactionResult>("/transactions", {
     method: "POST",
@@ -87,14 +102,22 @@ export async function createCheckoutTransaction(input: {
         email: input.email,
       },
       checkout: {
-        success_url: input.successUrl,
+        url: checkoutPageUrl,
+        success_url: successUrl,
       },
     }),
   });
 
-  const checkoutUrl = data.checkout?.url;
-  if (!checkoutUrl) {
-    throw new AppError(502, "Paddle did not return a checkout URL");
+  const checkoutUrl =
+    data.checkout?.url && !data.checkout.url.includes("localhost")
+      ? data.checkout.url
+      : `${checkoutPageUrl}?_ptxn=${encodeURIComponent(data.id)}`;
+
+  if (checkoutUrl.includes("localhost")) {
+    throw new AppError(
+      502,
+      "Paddle returned a localhost checkout URL. Set Default payment link / checkout.url to your https API host."
+    );
   }
 
   return {

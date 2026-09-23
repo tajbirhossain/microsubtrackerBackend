@@ -96,6 +96,83 @@ app.get("/", (_req, res) => {
   });
 });
 
+/** Paddle.js page — default payment link target. Opens overlay from ?_ptxn= */
+app.get("/checkout", (_req, res) => {
+  const token = config.paddle.clientToken;
+  if (!token) {
+    res.status(503).type("html").send("<p>Paddle client token is not configured.</p>");
+    return;
+  }
+
+  const isSandbox = config.paddle.env !== "live";
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.status(200).send(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Micro Sub Tracker Checkout</title>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <style>
+      body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:#0b0b0c; color:#fff; font-family:system-ui,sans-serif; text-align:center; padding:24px; }
+      p { opacity:.8; line-height:1.5; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <p id="status">Opening secure checkout…</p>
+      <p id="hint" style="display:none;font-size:14px;margin-top:12px;"></p>
+    </div>
+    <script>
+      (function () {
+        var token = ${JSON.stringify(token)};
+        var sandbox = ${isSandbox ? "true" : "false"};
+        var statusEl = document.getElementById("status");
+        var hintEl = document.getElementById("hint");
+        try {
+          if (sandbox) { Paddle.Environment.set("sandbox"); }
+          Paddle.Initialize({ token: token });
+          var params = new URLSearchParams(window.location.search);
+          var txn = params.get("_ptxn");
+          if (!txn) {
+            statusEl.textContent = "Missing checkout session.";
+            hintEl.style.display = "block";
+            hintEl.textContent = "Return to the app and tap Get Plus / Get Pro again.";
+            return;
+          }
+          // Paddle.js auto-opens when _ptxn is present after Initialize.
+          // Explicit open as a backup for some mobile webviews:
+          Paddle.Checkout.open({ transactionId: txn });
+        } catch (err) {
+          statusEl.textContent = "Could not open checkout.";
+          hintEl.style.display = "block";
+          hintEl.textContent = String(err && err.message ? err.message : err);
+        }
+      })();
+    </script>
+  </body>
+</html>`);
+});
+
+/** Paddle success_url landing page → deep-link back into the Expo app. */
+app.get("/billing/return", (_req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.status(200).send(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Returning to Micro Sub Tracker…</title>
+    <meta http-equiv="refresh" content="0;url=microsubtracker://billing/return" />
+  </head>
+  <body style="font-family: system-ui, sans-serif; background:#0b0b0c; color:#fff; display:flex; min-height:100vh; align-items:center; justify-content:center;">
+    <p>Payment received. Returning to the app…<br/><a style="color:#5B9EFF" href="microsubtracker://billing/return">Tap here if nothing happens</a></p>
+    <script>window.location.replace("microsubtracker://billing/return");</script>
+  </body>
+</html>`);
+});
+
 app.use("/api", rateLimit(), routes);
 
 app.use(notFound);

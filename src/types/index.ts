@@ -58,6 +58,7 @@ export interface GeminiConfig {
 export interface PaddleConfig {
   env: "sandbox" | "live";
   apiKey: string | null;
+  clientToken: string | null;
   webhookSecret: string | null;
   apiBaseUrl: string;
   prices: {

@@ -10,11 +10,6 @@ import * as userRepo from "../repositories/user.repository.js";
 import { logger } from "../observability/logger.js";
 import type { AuthUser, PlanStatus, PlanTier } from "../types/index.js";
 
-function successUrl(): string {
-  // Deep link so Expo can resume after sandbox checkout.
-  return "microsubtracker://billing/return";
-}
-
 export async function startCheckout(input: {
   userId: string;
   email: string;
@@ -28,7 +23,6 @@ export async function startCheckout(input: {
     plan: input.plan,
     userId: input.userId,
     email: input.email,
-    successUrl: successUrl(),
   });
 
   return {

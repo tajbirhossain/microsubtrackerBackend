@@ -238,6 +238,7 @@ export function loadConfig(): AppConfig {
       return {
         env: paddleEnv,
         apiKey: optionalEnv("PADDLE_API_KEY", "") || null,
+        clientToken: optionalEnv("PADDLE_CLIENT_TOKEN", "") || null,
         webhookSecret: optionalEnv("PADDLE_WEBHOOK_SECRET", "") || null,
         apiBaseUrl:
           paddleEnv === "live"
