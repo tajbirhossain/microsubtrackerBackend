@@ -1,0 +1,40 @@
+name: Deploy API to VPS
+
+# Same pattern as jbh-backend: push to main (or manual run) SSHs into the
+# VPS and runs scripts/deploy.sh. Does not touch other apps on the box.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-microsub
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: SSH deploy to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            test -d /var/www/microsubtrackerBackend || {
+              echo "ERROR: /var/www/microsubtrackerBackend missing. Clone the repo on the VPS once first."
+              exit 1
+            }
+            test -f /var/www/microsubtrackerBackend/.env || {
+              echo "ERROR: /var/www/microsubtrackerBackend/.env missing. Create it on the VPS once."
+              exit 1
+            }
+            cd /var/www/microsubtrackerBackend
+            bash scripts/deploy.sh

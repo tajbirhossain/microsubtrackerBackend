@@ -70,3 +70,17 @@ npm run parser:test
 npm run currency:test
 npm run security:check
 ```
+
+## Deploy (VPS + GitHub Actions)
+
+Same idea as the JBH backend. Push to `main` (or run the workflow manually) SSHs into the VPS and runs `scripts/deploy.sh` in `/var/www/microsubtrackerBackend` only — won't touch other apps on the box.
+
+1. VPS already has the repo + `.env` + pm2 (`microsub-api`).
+2. In **this** GitHub repo → Settings → Secrets and variables → Actions, add the same trio as JBH: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (secrets are per-repo, so copy them over).
+3. Push to `main`. Workflow pulls, `npm ci`, builds, migrates, restarts pm2.
+
+Manual on the VPS anytime:
+
+```bash
+bash /var/www/microsubtrackerBackend/scripts/deploy.sh
+```
