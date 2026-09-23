@@ -84,3 +84,19 @@ Manual on the VPS anytime:
 ```bash
 bash /var/www/microsubtrackerBackend/scripts/deploy.sh
 ```
+
+## Paddle Billing (sandbox)
+
+Env (see `.env.example`):
+
+- `PADDLE_ENV=sandbox`
+- `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`
+- `PADDLE_PRICE_PLUS`, `PADDLE_PRICE_PRO`
+
+In the Paddle sandbox dashboard, add a notification destination:
+
+`https://api.microsubtracker.tajbirhossain.com/api/billing/webhooks`
+
+Subscribe at least to: `transaction.completed`, `subscription.activated`, `subscription.updated`, `subscription.canceled`.
+
+Checkout flow: `POST /api/billing/checkout` → app opens hosted checkout URL → webhook updates `users.plan_*`.

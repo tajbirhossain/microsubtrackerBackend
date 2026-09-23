@@ -7,6 +7,8 @@ export function toAuthUser(user: UserRow): AuthUser {
     email: user.email,
     displayName: user.display_name,
     preferredCurrency: user.preferred_currency,
+    planTier: user.plan_tier ?? null,
+    planStatus: user.plan_status ?? "none",
     createdAt: user.created_at.toISOString(),
   };
 }

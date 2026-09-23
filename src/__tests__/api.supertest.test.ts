@@ -62,6 +62,11 @@ const testUser = {
   preferred_currency: "USD",
   email_verified_at: new Date("2026-01-01T00:00:00.000Z"),
   deleted_at: null,
+  plan_tier: null,
+  plan_status: "none" as const,
+  paddle_customer_id: null,
+  paddle_subscription_id: null,
+  plan_updated_at: null,
   created_at: new Date("2026-01-01T00:00:00.000Z"),
   updated_at: new Date("2026-01-01T00:00:00.000Z"),
 };
@@ -112,6 +117,8 @@ const getCurrentUser = jest.fn(async () => ({
   email: testUser.email,
   displayName: testUser.display_name,
   preferredCurrency: testUser.preferred_currency,
+  planTier: null,
+  planStatus: "none" as const,
   createdAt: testUser.created_at.toISOString(),
 }));
 

@@ -71,7 +71,18 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "8mb", strict: true }));
+app.use(
+  express.json({
+    limit: "8mb",
+    strict: true,
+    verify: (req, _res, buf) => {
+      const url = "originalUrl" in req ? String((req as { originalUrl?: string }).originalUrl ?? "") : "";
+      if (url.includes("/billing/webhooks")) {
+        (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false, limit: "8mb" }));
 app.use(requireJsonContentType);
 app.use(rejectClientUserId);

@@ -23,6 +23,11 @@ export interface UserRow {
   preferred_currency: string;
   email_verified_at: Date | null;
   deleted_at: Date | null;
+  plan_tier: "plus" | "pro" | null;
+  plan_status: "none" | "active" | "past_due" | "canceled";
+  paddle_customer_id: string | null;
+  paddle_subscription_id: string | null;
+  plan_updated_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }

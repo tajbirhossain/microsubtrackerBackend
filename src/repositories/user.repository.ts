@@ -134,3 +134,73 @@ export async function softDeleteUser(
     client
   );
 }
+
+export type BillingEntitlementInput = {
+  planTier: "plus" | "pro" | null;
+  planStatus: "none" | "active" | "past_due" | "canceled";
+  paddleCustomerId?: string | null;
+  paddleSubscriptionId?: string | null;
+};
+
+export async function updateBillingEntitlement(
+  userId: string,
+  input: BillingEntitlementInput,
+  client?: Queryable
+): Promise<UserRow | null> {
+  return queryOne<UserRow>(
+    `
+      UPDATE users
+      SET
+        plan_tier = $2,
+        plan_status = $3,
+        paddle_customer_id = COALESCE($4, paddle_customer_id),
+        paddle_subscription_id = COALESCE($5, paddle_subscription_id),
+        plan_updated_at = NOW()
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING *
+    `,
+    [
+      userId,
+      input.planTier,
+      input.planStatus,
+      input.paddleCustomerId ?? null,
+      input.paddleSubscriptionId ?? null,
+    ],
+    client
+  );
+}
+
+export async function findActiveUserByPaddleCustomerId(
+  paddleCustomerId: string,
+  client?: Queryable
+): Promise<UserRow | null> {
+  return queryOne<UserRow>(
+    `
+      SELECT *
+      FROM users
+      WHERE paddle_customer_id = $1
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+    [paddleCustomerId],
+    client
+  );
+}
+
+export async function findActiveUserByPaddleSubscriptionId(
+  paddleSubscriptionId: string,
+  client?: Queryable
+): Promise<UserRow | null> {
+  return queryOne<UserRow>(
+    `
+      SELECT *
+      FROM users
+      WHERE paddle_subscription_id = $1
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+    [paddleSubscriptionId],
+    client
+  );
+}
